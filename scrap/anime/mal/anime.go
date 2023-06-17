@@ -80,6 +80,15 @@ func LoadAnime[T string | int](url T) (*Anime, error) {
 				})
 			}
 		})
+		doc.Find(`.js-alternative-titles>.spaceit_pad`).Each(func(i int, s *goquery.Selection) {
+			key := strings.Replace(strings.ToLower(s.ChildrenFiltered(`span.dark_text`).Text()), ":", "", 1)
+			value := strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n ")
+			anime.Information = append(anime.Information, Info{
+				Key:   key,
+				Value: value,
+			})
+
+		})
 		doc.Find(".anime_detail_related_anime>tbody>tr").Each(func(i int, s *goquery.Selection) {
 			typeof := ""
 			s.ChildrenFiltered("td").Each(func(i int, s *goquery.Selection) {

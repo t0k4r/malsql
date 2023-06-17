@@ -1,20 +1,20 @@
 CREATE TABLE IF NOT EXISTS public.anime_types (
-	type_id serial4 NOT NULL,
+	type_id serial NOT NULL,
 	type_name varchar NULL,
 	CONSTRAINT anime_type_pk PRIMARY KEY (type_id),
 	CONSTRAINT anime_type_un UNIQUE (type_name)
 );
 CREATE TABLE IF NOT EXISTS public.anime_seasons (
-	season_id serial4 NOT NULL,
+	season_id serial NOT NULL,
 	season_name varchar NULL,
 	CONSTRAINT anime_season_pk PRIMARY KEY (season_id),
 	CONSTRAINT anime_season_un UNIQUE (season_name)
 );
 CREATE TABLE IF NOT EXISTS public.animes (
-	anime_id serial4 NOT NULL,
+	anime_id serial NOT NULL,
 	anime_title varchar NOT NULL,
-	season_id int4 NULL,
-	type_id int4 NULL,
+	season_id int NULL,
+	type_id int NULL,
 	anime_title_en varchar NULL,
 	anime_title_jp varchar NULL,
 	anime_start date NULL,
@@ -28,40 +28,46 @@ CREATE TABLE IF NOT EXISTS public.animes (
 	CONSTRAINT animes_fk_1 FOREIGN KEY (type_id) REFERENCES public.anime_types(type_id)
 );
 CREATE TABLE IF NOT EXISTS public.genres (
-	genre_id serial4 NOT NULL,
+	genre_id serial NOT NULL,
 	genre_name varchar NULL,
 	CONSTRAINT genres_pk PRIMARY KEY (genre_id),
 	CONSTRAINT genres_un UNIQUE (genre_name)
 );
 CREATE TABLE IF NOT EXISTS public.studios (
-	studio_id serial4 NOT NULL,
+	studio_id serial NOT NULL,
 	studio_name varchar NULL,
 	CONSTRAINT studios_pk PRIMARY KEY (studio_id),
 	CONSTRAINT studios_un UNIQUE (studio_name)
 );
 CREATE TABLE IF NOT EXISTS public.themes (
-	theme_id serial4 NOT NULL,
+	theme_id serial NOT NULL,
 	theme_name varchar NULL,
 	CONSTRAINT themes_pk PRIMARY KEY (theme_id),
 	CONSTRAINT themes_un UNIQUE (theme_name)
 );
 CREATE TABLE IF NOT EXISTS public.anime_genres (
-	anime_id int4 NOT NULL,
-	genre_id int4 NOT NULL,
+	anime_genres_id serial NOT NULL,
+	anime_id int NOT NULL,
+	genre_id int NOT NULL,
+	CONSTRAINT anime_genres_pk PRIMARY KEY (anime_genres_id),
 	CONSTRAINT anime_genres_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_genres_fk_1 FOREIGN KEY (genre_id) REFERENCES public.genres(genre_id),
 	CONSTRAINT anime_genres_un UNIQUE (anime_id, genre_id)
 );
 CREATE TABLE IF NOT EXISTS public.anime_studios (
-	anime_id int4 NOT NULL,
-	studio_id int4 NOT NULL,
+	anime_studios_id serial NOT NULL,
+	anime_id int NOT NULL,
+	studio_id int NOT NULL,
+	CONSTRAINT anime_studios_pk PRIMARY KEY (anime_studios_id),
 	CONSTRAINT anime_studios_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_studios_fk_1 FOREIGN KEY (studio_id) REFERENCES public.studios(studio_id),
 	CONSTRAINT anime_studios_un UNIQUE (anime_id, studio_id)
 );
 CREATE TABLE IF NOT EXISTS public.anime_themes (
-	anime_id int4 NOT NULL,
-	theme_id int4 NOT NULL,
+	anime_themes_id serial NOT NULL,
+	anime_id int NOT NULL,
+	theme_id int NOT NULL,
+	CONSTRAINT anime_themes_pk PRIMARY KEY (anime_themes_id),
 	CONSTRAINT anime_themes_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_themes_fk_1 FOREIGN KEY (theme_id) REFERENCES public.themes(theme_id),
 	CONSTRAINT anime_themes_un UNIQUE (anime_id, theme_id)
@@ -83,9 +89,11 @@ CREATE TABLE IF NOT EXISTS public.relations (
 	CONSTRAINT relations_un UNIQUE (relation_name)
 );
 CREATE TABLE IF NOT EXISTS public.anime_relations (
+	anime_relations_id serial NOT NULL,
 	anime_id int NOT NULL,
 	related_anime_id int NOT NULL,
 	relation_id int NOT NULL,
+	CONSTRAINT anime_relations_pk PRIMARY KEY (anime_relations_id),
 	CONSTRAINT anime_relations_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_relations_fk_1 FOREIGN KEY (related_anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_relations_fk_2 FOREIGN KEY (relation_id) REFERENCES public.relations(relation_id)
