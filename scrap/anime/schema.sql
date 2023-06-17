@@ -46,28 +46,22 @@ CREATE TABLE IF NOT EXISTS public.themes (
 	CONSTRAINT themes_un UNIQUE (theme_name)
 );
 CREATE TABLE IF NOT EXISTS public.anime_genres (
-	anime_genres_id serial NOT NULL,
 	anime_id int NOT NULL,
 	genre_id int NOT NULL,
-	CONSTRAINT anime_genres_pk PRIMARY KEY (anime_genres_id),
 	CONSTRAINT anime_genres_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_genres_fk_1 FOREIGN KEY (genre_id) REFERENCES public.genres(genre_id),
 	CONSTRAINT anime_genres_un UNIQUE (anime_id, genre_id)
 );
 CREATE TABLE IF NOT EXISTS public.anime_studios (
-	anime_studios_id serial NOT NULL,
 	anime_id int NOT NULL,
 	studio_id int NOT NULL,
-	CONSTRAINT anime_studios_pk PRIMARY KEY (anime_studios_id),
 	CONSTRAINT anime_studios_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_studios_fk_1 FOREIGN KEY (studio_id) REFERENCES public.studios(studio_id),
 	CONSTRAINT anime_studios_un UNIQUE (anime_id, studio_id)
 );
 CREATE TABLE IF NOT EXISTS public.anime_themes (
-	anime_themes_id serial NOT NULL,
 	anime_id int NOT NULL,
 	theme_id int NOT NULL,
-	CONSTRAINT anime_themes_pk PRIMARY KEY (anime_themes_id),
 	CONSTRAINT anime_themes_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_themes_fk_1 FOREIGN KEY (theme_id) REFERENCES public.themes(theme_id),
 	CONSTRAINT anime_themes_un UNIQUE (anime_id, theme_id)
@@ -89,11 +83,9 @@ CREATE TABLE IF NOT EXISTS public.relations (
 	CONSTRAINT relations_un UNIQUE (relation_name)
 );
 CREATE TABLE IF NOT EXISTS public.anime_relations (
-	anime_relations_id serial NOT NULL,
 	anime_id int NOT NULL,
 	related_anime_id int NOT NULL,
 	relation_id int NOT NULL,
-	CONSTRAINT anime_relations_pk PRIMARY KEY (anime_relations_id),
 	CONSTRAINT anime_relations_fk FOREIGN KEY (anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_relations_fk_1 FOREIGN KEY (related_anime_id) REFERENCES public.animes(anime_id),
 	CONSTRAINT anime_relations_fk_2 FOREIGN KEY (relation_id) REFERENCES public.relations(relation_id)
