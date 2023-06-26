@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.animes (
 	aired_from date NULL,
 	aired_to date NULL,
 	season_id int NULL,
-	type_of_id int NULL,
+	type_id int NULL,
 	CONSTRAINT animes_pk PRIMARY KEY (id),
 	CONSTRAINT animes_un UNIQUE (mal_url),
 	CONSTRAINT animes_fk FOREIGN KEY (season_id) REFERENCES public.seasons(id),
