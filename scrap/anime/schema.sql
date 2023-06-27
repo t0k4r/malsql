@@ -59,3 +59,18 @@ CREATE TABLE IF NOT EXISTS public.anime_infos (
 	CONSTRAINT anime_infos_fk FOREIGN KEY (anime_id) REFERENCES public.animes(id),
 	CONSTRAINT anime_infos_fk_1 FOREIGN KEY (info_id) REFERENCES public.infos(id)
 );
+CREATE TABLE IF NOT EXISTS public.relations (
+	id serial NOT NULL,
+	name_of varchar NOT NULL,
+	CONSTRAINT relations_pk PRIMARY KEY (id),
+	CONSTRAINT relations_un UNIQUE (name_of)
+);
+CREATE TABLE IF NOT EXISTS public.anime_relations (
+	anime_id int NOT NULL,
+	related_id int NOT NULL,
+	relation_id int NULL,
+	CONSTRAINT anime_relations_un UNIQUE (anime_id,related_id,relation_id),
+	CONSTRAINT anime_relations_fk FOREIGN KEY (anime_id) REFERENCES public.animes(id),
+	CONSTRAINT anime_relations_fk_1 FOREIGN KEY (related_id) REFERENCES public.animes(id),
+	CONSTRAINT anime_relations_fk_2 FOREIGN KEY (relation_id) REFERENCES public.relations(id)
+);
