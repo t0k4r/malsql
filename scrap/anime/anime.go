@@ -13,14 +13,12 @@ type Episode struct {
 	Url   string
 }
 type filInfo struct {
-	titleEn string
-	titleJp string
-	typeOf  string
-	season  string
-	aired   []string
-	genres  []string
-	themes  []string
-	studios []string
+	titleEn    string
+	titleJp    string
+	typeOf     string
+	season     string
+	seasonDate string
+	aired      []string
 }
 
 type Anime struct {
@@ -50,12 +48,30 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 
 func (a *Anime) filter() {
 	var filterd filInfo
+	var minInfo []mal.Info
 	for _, i := range a.Information {
 		switch i.Key {
 		case "type":
 			filterd.typeOf = i.Value
 		case "premiered":
 			filterd.season = i.Value
+			sds := strings.Split(strings.Trim(i.Value, " \n"), " ")
+			if len(sds) == 2 {
+				t, err := time.Parse("2006", sds[1])
+				if err == nil {
+					switch sds[0] {
+					case "Spring":
+						t = t.AddDate(0, 2, 20)
+					case "Summer":
+						t = t.AddDate(0, 5, 21)
+					case "Fall":
+						t = t.AddDate(0, 8, 23)
+					case "Winter":
+						t = t.AddDate(0, 11, 22)
+					}
+					filterd.seasonDate = t.Format("2006-01-02")
+				}
+			}
 		case "aired":
 			for _, i := range strings.Split(i.Value, "to") {
 				i = strings.Trim(i, " \n")
@@ -77,19 +93,16 @@ func (a *Anime) filter() {
 					}
 				}
 			}
-		case "genres":
-			filterd.genres = append(filterd.genres, i.Value)
-		case "themes":
-			filterd.themes = append(filterd.themes, i.Value)
-		case "studios":
-			filterd.studios = append(filterd.studios, i.Value)
 		case "english":
 			filterd.titleEn = i.Value
 		case "japanese":
 			filterd.titleJp = i.Value
+		default:
+			minInfo = append(minInfo, i)
 		}
 	}
 	a.filInf = filterd
+	a.Information = minInfo
 }
 
 func loadEpisodes(malUrl string, title string) ([]Episode, error) {

@@ -37,7 +37,7 @@ func New() Scrapper {
 			log.Panic(err)
 		}
 	}
-	rows, err := db.Query("SELECT anime_mal_URL FROM animes")
+	rows, err := db.Query("SELECT mal_url FROM animes")
 	if err != nil {
 		log.Panic(err)
 	}
