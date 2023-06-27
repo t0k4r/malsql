@@ -28,27 +28,6 @@ func animeSql(anime Anime) []string {
 	q.SubQ("season_id", `SELECT season_id FROM anime_seasons WHERE season_name = '%v'`, anime.filInf.season)
 	q.Str("anime_start", getOrEmpty(anime.filInf.aired, 0)).Str("anime_end", getOrEmpty(anime.filInf.aired, 1))
 	sql = appendOk(sql, q.Sql())
-	for _, genre := range anime.filInf.genres {
-		sql = appendOk(sql, qb.Insert("genres").Str("genre_name", genre).Sql())
-		q := qb.Insert("anime_genres")
-		q.SubQ("anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, anime.MalUrl)
-		q.SubQ("genre_id", `SELECT genre_id FROM genres WHERE genre_name = '%v'`, genre)
-		sql = appendOk(sql, q.Sql())
-	}
-	for _, theme := range anime.filInf.themes {
-		sql = appendOk(sql, qb.Insert("themes").Str("theme_name", theme).Sql())
-		q := qb.Insert("anime_themes")
-		q.SubQ("anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, anime.MalUrl)
-		q.SubQ("theme_id", `SELECT theme_id FROM themes WHERE theme_name = '%v'`, theme)
-		sql = appendOk(sql, q.Sql())
-	}
-	for _, studio := range anime.filInf.studios {
-		sql = appendOk(sql, qb.Insert("studios").Str("studio_name", studio).Sql())
-		q := qb.Insert("anime_studios")
-		q.SubQ("anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, anime.MalUrl)
-		q.SubQ("studio_id", `SELECT studio_id FROM studios WHERE studio_name = '%v'`, studio)
-		sql = appendOk(sql, q.Sql())
-	}
 	for i, episode := range anime.Episodes {
 		q := qb.Insert("anime_episodes")
 		q.Str("episode_title", episode.Title).Str("episode_stream_url", episode.Url)

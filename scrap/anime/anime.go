@@ -18,9 +18,6 @@ type filInfo struct {
 	typeOf  string
 	season  string
 	aired   []string
-	genres  []string
-	themes  []string
-	studios []string
 }
 
 type Anime struct {
@@ -50,6 +47,7 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 
 func (a *Anime) filter() {
 	var filterd filInfo
+	var minInfo []mal.Info
 	for _, i := range a.Information {
 		switch i.Key {
 		case "type":
@@ -77,19 +75,16 @@ func (a *Anime) filter() {
 					}
 				}
 			}
-		case "genres":
-			filterd.genres = append(filterd.genres, i.Value)
-		case "themes":
-			filterd.themes = append(filterd.themes, i.Value)
-		case "studios":
-			filterd.studios = append(filterd.studios, i.Value)
 		case "english":
 			filterd.titleEn = i.Value
 		case "japanese":
 			filterd.titleJp = i.Value
+		default:
+			minInfo = append(minInfo, i)
 		}
 	}
 	a.filInf = filterd
+	a.Information = minInfo
 }
 
 func loadEpisodes(malUrl string, title string) ([]Episode, error) {
