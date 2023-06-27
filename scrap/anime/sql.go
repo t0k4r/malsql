@@ -19,21 +19,27 @@ var Schema string
 
 func animeSql(anime Anime) []string {
 	var sql []string
-	sql = appendOk(sql, qb.Insert("anime_types").Str("type_name", anime.filInf.typeOf).Sql())
-	sql = appendOk(sql, qb.Insert("anime_seasons").Str("season_name", anime.filInf.season).Sql())
-	q := qb.Insert("animes").Str("anime_description", anime.Description)
-	q.Str("anime_title", anime.Title).Str("anime_title_en", anime.filInf.titleEn).Str("anime_title_jp", anime.filInf.titleJp)
-	q.Str("anime_mal_url", anime.MalUrl).Str("anime_img_url", anime.ImgUrl)
-	q.SubQ("type_id", `SELECT type_id FROM anime_types WHERE type_name = '%v'`, anime.filInf.typeOf)
-	q.SubQ("season_id", `SELECT season_id FROM anime_seasons WHERE season_name = '%v'`, anime.filInf.season)
-	q.Str("anime_start", getOrEmpty(anime.filInf.aired, 0)).Str("anime_end", getOrEmpty(anime.filInf.aired, 1))
-	sql = appendOk(sql, q.Sql())
+	sql = appendOk(sql, qb.Insert("anime_types").Str("name_of", anime.filInf.typeOf).Sql())
+	sql = appendOk(sql, qb.Insert("seasons").Str("name_of", anime.filInf.season).Str("value", anime.filInf.seasonDate).Sql())
+	sql = append(sql, qb.Insert("animes").Str("description", anime.Description).
+		Str("title", anime.Title).Str("title_en", anime.filInf.titleEn).Str("title_jp", anime.filInf.titleJp).
+		Str("mal_url", anime.MalUrl).Str("cover_url", anime.ImgUrl).
+		SubQ("type_id", `SELECT t.id FROM anime_types t WHERE t.name_of = '%v'`, anime.filInf.typeOf).
+		SubQ("season_id", `SELECT s.id FROM seasons s WHERE s.name_of = '%v'`, anime.filInf.season).
+		Str("aired_from", getOrEmpty(anime.filInf.aired, 0)).Str("aired_to", getOrEmpty(anime.filInf.aired, 1)).Sql())
 	for i, episode := range anime.Episodes {
-		q := qb.Insert("anime_episodes")
-		q.Str("episode_title", episode.Title).Str("episode_stream_url", episode.Url)
-		q.Int("episode_index", i)
-		q.SubQ("anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, anime.MalUrl)
+		q := qb.Insert("episodes").
+			Str("title", episode.Title).Str("stream_url", episode.Url).Int("index_of", i).
+			SubQ("anime_id", `SELECT a.id FROM animes a WHERE a.mal_url = '%v'`, anime.MalUrl)
 		sql = appendOk(sql, q.Sql())
+	}
+	for _, info := range anime.Information {
+		sql = append(sql, qb.Insert("info_types").Str("name_of", info.Key).Sql())
+		sql = append(sql, qb.Insert("infos").Str("value", info.Value).
+			SubQ("type_id", "SELECT t.id FROM info_types t WHERE t.name_of = '%v'", info.Key).Sql())
+		sql = append(sql, qb.Insert("anime_infos").
+			SubQ("info_id", "SELECT id FROM infos WHERE value = '%v'", info.Value).
+			SubQ("anime_id", `SELECT id FROM animes WHERE mal_url = '%v'`, anime.MalUrl).Sql())
 	}
 	return sql
 
@@ -41,11 +47,11 @@ func animeSql(anime Anime) []string {
 
 func relationsSql(relation Relation) []string {
 	var sql []string
-	sql = appendOk(sql, qb.Insert("relations").Str("relation_name", relation.TypeOf).Sql())
+	sql = appendOk(sql, qb.Insert("relations").Str("name_of", relation.TypeOf).Sql())
 	q := qb.Insert("anime_relations")
-	q.SubQ("anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, relation.Root)
-	q.SubQ("related_anime_id", `SELECT anime_id FROM animes WHERE anime_mal_url = '%v'`, relation.Related)
-	q.SubQ("relation_id", `SELECT relation_id FROM relations WHERE relation_name = '%v'`, relation.TypeOf)
+	q.SubQ("anime_id", `SELECT id FROM animes WHERE mal_url = '%v'`, relation.Root)
+	q.SubQ("related_id", `SELECT id FROM animes WHERE mal_url = '%v'`, relation.Related)
+	q.SubQ("relation_id", `SELECT id FROM relations WHERE name_of = '%v'`, relation.TypeOf)
 	sql = appendOk(sql, q.Sql())
 	return sql
 }

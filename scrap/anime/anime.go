@@ -13,11 +13,12 @@ type Episode struct {
 	Url   string
 }
 type filInfo struct {
-	titleEn string
-	titleJp string
-	typeOf  string
-	season  string
-	aired   []string
+	titleEn    string
+	titleJp    string
+	typeOf     string
+	season     string
+	seasonDate string
+	aired      []string
 }
 
 type Anime struct {
@@ -54,6 +55,23 @@ func (a *Anime) filter() {
 			filterd.typeOf = i.Value
 		case "premiered":
 			filterd.season = i.Value
+			sds := strings.Split(strings.Trim(i.Value, " \n"), " ")
+			if len(sds) == 2 {
+				t, err := time.Parse("2006", sds[1])
+				if err == nil {
+					switch sds[0] {
+					case "Spring":
+						t = t.AddDate(0, 2, 20)
+					case "Summer":
+						t = t.AddDate(0, 5, 21)
+					case "Fall":
+						t = t.AddDate(0, 8, 23)
+					case "Winter":
+						t = t.AddDate(0, 11, 22)
+					}
+					filterd.seasonDate = t.Format("2006-01-02")
+				}
+			}
 		case "aired":
 			for _, i := range strings.Split(i.Value, "to") {
 				i = strings.Trim(i, " \n")
