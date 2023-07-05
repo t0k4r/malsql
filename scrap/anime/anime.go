@@ -13,8 +13,6 @@ type Episode struct {
 	Url   string
 }
 type filInfo struct {
-	titleEn    string
-	titleJp    string
 	typeOf     string
 	season     string
 	seasonDate string
@@ -93,10 +91,6 @@ func (a *Anime) filter() {
 					}
 				}
 			}
-		case "english":
-			filterd.titleEn = i.Value
-		case "japanese":
-			filterd.titleJp = i.Value
 		default:
 			minInfo = append(minInfo, i)
 		}

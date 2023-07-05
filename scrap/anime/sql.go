@@ -22,8 +22,7 @@ func animeSql(anime Anime) []string {
 	sql = appendOk(sql, qb.Insert("anime_types").Str("name_of", anime.filInf.typeOf).Sql())
 	sql = appendOk(sql, qb.Insert("seasons").Str("name_of", anime.filInf.season).Str("value", anime.filInf.seasonDate).Sql())
 	sql = append(sql, qb.Insert("animes").Str("description", anime.Description).
-		Str("title", anime.Title).Str("title_en", anime.filInf.titleEn).Str("title_jp", anime.filInf.titleJp).
-		Str("mal_url", anime.MalUrl).Str("cover_url", anime.ImgUrl).
+		Str("title", anime.Title).Str("mal_url", anime.MalUrl).Str("cover_url", anime.ImgUrl).
 		SubQ("type_id", `SELECT t.id FROM anime_types t WHERE t.name_of = '%v'`, anime.filInf.typeOf).
 		SubQ("season_id", `SELECT s.id FROM seasons s WHERE s.name_of = '%v'`, anime.filInf.season).
 		Str("aired_from", getOrEmpty(anime.filInf.aired, 0)).Str("aired_to", getOrEmpty(anime.filInf.aired, 1)).Sql())

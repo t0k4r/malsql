@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS public.anime_types (
 CREATE TABLE IF NOT EXISTS public.animes (
 	id serial NOT NULL,
 	title varchar NOT NULL,
-	title_en varchar NULL,
-	title_jp varchar NULL,
 	description varchar NULL,
 	mal_url varchar NOT NULL,
 	cover_url varchar NULL,
