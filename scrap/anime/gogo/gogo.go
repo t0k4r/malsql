@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -27,29 +28,41 @@ func GetEpisodes(title string) ([]string, error) {
 	if err != nil {
 		return urls, err
 	}
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 	urls = make([]string, len(pages))
 	for i, page := range pages {
 		wg.Add(1)
-		go func(i int, url string) {
-			res, err := http.Get(url)
-			if err != nil {
-				log.Panic(err)
-			}
-			doc, err := goquery.NewDocumentFromReader(res.Body)
-			if err != nil {
-				log.Panic(err)
-			}
-			vid, ok := doc.Find("li.anime>a").Attr("data-video")
-			if ok {
-				urls[i] = fmt.Sprintf("%v", vid)
-			}
-			wg.Done()
-		}(i, page)
+		go getStreamUrl(i, page, urls, wg)
 	}
 	wg.Wait()
 	return urls, nil
 
+}
+
+func getStreamUrl(i int, url string, urls []string, wg *sync.WaitGroup) {
+	res, err := http.Get(url)
+	if err != nil {
+		if errors.Is(err, syscall.ECONNRESET) {
+			getStreamUrl(i, url, urls, wg)
+			return
+		} else {
+			log.Panic(err)
+		}
+	}
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		if errors.Is(err, syscall.ECONNRESET) {
+			getStreamUrl(i, url, urls, wg)
+			return
+		} else {
+			log.Panic(err)
+		}
+	}
+	vid, ok := doc.Find("li.anime>a").Attr("data-video")
+	if ok {
+		urls[i] = fmt.Sprintf("%v", vid)
+	}
+	wg.Done()
 }
 
 func getInfoPage(title string) (string, string, error) {
@@ -57,7 +70,11 @@ func getInfoPage(title string) (string, string, error) {
 	url := fmt.Sprintf("https://www3.gogoanimes.fi/search.html?keyword=%v", title)
 	res, err := http.Get(url)
 	if err != nil {
-		return "", "", err
+		if errors.Is(err, syscall.ECONNRESET) {
+			return getInfoPage(title)
+		} else {
+			return "", "", err
+		}
 	}
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
@@ -73,7 +90,11 @@ func getInfoPage(title string) (string, string, error) {
 func getMovieId(infoUrl string) (string, error) {
 	res, err := http.Get(infoUrl)
 	if err != nil {
-		return "", err
+		if errors.Is(err, syscall.ECONNRESET) {
+			return getMovieId(infoUrl)
+		} else {
+			return "", err
+		}
 	}
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
@@ -90,7 +111,11 @@ func getVideoPages(id string, title string) ([]string, error) {
 	var pages []string
 	res, err := http.Get(fmt.Sprintf("https://ajax.gogo-load.com/ajax/load-list-episode?ep_start=0&ep_end=228922&id=%v&default_ep=0&alias=%v", id, title))
 	if err != nil {
-		return pages, err
+		if errors.Is(err, syscall.ECONNRESET) {
+			return getVideoPages(id, title)
+		} else {
+			return pages, err
+		}
 	}
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {

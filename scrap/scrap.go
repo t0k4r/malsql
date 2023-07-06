@@ -51,7 +51,7 @@ func New() Scrapper {
 		urls:        make(chan int),
 		series:      make(chan *anime.Series),
 		workersDone: 0,
-		maxWorkers:  16,
+		maxWorkers:  8,
 		done:        done,
 		db:          db,
 	}
