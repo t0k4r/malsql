@@ -3,6 +3,8 @@ package anime
 import (
 	"MalSql/scrap/anime/gogo"
 	"MalSql/scrap/anime/mal"
+	"strings"
+	"time"
 )
 
 type Episode struct {
@@ -64,6 +66,54 @@ func (a *Anime) filterInfos() {
 	var filtered []mal.Info
 	for _, info := range a.Information {
 		switch info.Key {
+		case "type":
+			a.typeOf = info.Value
+		case "premiered":
+			a.season = info.Value
+			sds := strings.Split(strings.Trim(info.Value, " \n"), " ")
+			if len(sds) == 2 {
+				t, err := time.Parse("2006", sds[1])
+				if err == nil {
+					switch sds[0] {
+					case "Spring":
+						t = t.AddDate(0, 2, 20)
+					case "Summer":
+						t = t.AddDate(0, 5, 21)
+					case "Fall":
+						t = t.AddDate(0, 8, 23)
+					case "Winter":
+						t = t.AddDate(0, 11, 22)
+					}
+					a.seasonDate = t.Format("2006-01-02")
+				}
+			}
+		case "aired":
+			for _, i := range strings.Split(info.Value, "to") {
+				i = strings.Trim(i, " \n")
+				switch len(i) {
+				case 4:
+					t, err := time.Parse("2006", i)
+					if err == nil {
+						a.aired = append(a.aired, t.Format("2006-01-02"))
+					}
+				case 8:
+					t, err := time.Parse("Jan 2006", i)
+					if err == nil {
+						a.aired = append(a.aired, t.Format("2006-01-02"))
+					}
+				case 11, 12:
+					t, err := time.Parse("Jan 2, 2006", i)
+					if err == nil {
+						a.aired = append(a.aired, t.Format("2006-01-02"))
+					}
+				}
+			}
+		case "synonyms", "japanese", "english", "german", "french", "spanish":
+			title := Title{lang: info.Key, title: info.Value}
+			a.altTitles = append(a.altTitles, title)
+		case "theme", "genre", "demographic", "producer", "licensor", "studio":
+			info.Key += "s"
+			filtered = append(filtered, info)
 		default:
 			filtered = append(filtered, info)
 		}
