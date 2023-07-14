@@ -50,7 +50,6 @@ func LoadAnime[T string | int](url T) (*Anime, error) {
 		return nil, ErrMal429
 	case 200:
 		doc, err := goquery.NewDocumentFromReader(res.Body)
-
 		if err != nil {
 			return nil, err
 		}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"MalSql/scrap"
 	"log"
 
 	"github.com/joho/godotenv"
@@ -12,6 +11,6 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-	s := scrap.New()
-	s.Run(1, 69000)
+	// s := scrap.New()
+	// s.Run(1, 69000)
 }

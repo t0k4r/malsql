@@ -7,8 +7,13 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func GetEpisodes(url string) ([]string, error) {
-	var episodes []string
+type Episode struct {
+	Title    string
+	AltTitle string
+}
+
+func GetEpisodes(url string) ([]Episode, error) {
+	var episodes []Episode
 	res, err := http.Get(fmt.Sprintf("%v/episode", url))
 	if err != nil {
 		return episodes, err
@@ -21,7 +26,10 @@ func GetEpisodes(url string) ([]string, error) {
 		return episodes, err
 	}
 	doc.Find(`td.episode-title .fl-l`).Each(func(i int, s *goquery.Selection) {
-		episodes = append(episodes, s.Text())
+		episodes = append(episodes, Episode{Title: s.Text()})
+	})
+	doc.Find(`td.episode-title di-ib`).Each(func(i int, s *goquery.Selection) {
+		episodes[i].AltTitle = s.Text()
 	})
 	return episodes, nil
 }
