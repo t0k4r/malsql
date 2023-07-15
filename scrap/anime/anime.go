@@ -3,13 +3,17 @@ package anime
 import (
 	"MalSql/scrap/anime/gogo"
 	"MalSql/scrap/anime/mal"
+	"MalSql/scrap/anime/qb"
+	"fmt"
 	"strings"
 	"time"
 )
 
 type Episode struct {
 	mal.Episode
-	Url string
+	index int
+	url   string
+	src   string
 }
 
 type Title struct {
@@ -30,16 +34,16 @@ type Anime struct {
 func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 	ma, err := mal.LoadAnime(malUrl)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	anime := &Anime{Anime: ma}
 	ep, err := mal.GetEpisodes(anime.MalUrl)
 	if err != nil {
-		panic(err)
+		return anime, err
 	}
 	es, err := gogo.GetEpisodes(anime.Title)
 	if err != nil && err != gogo.ErrGoGo404 {
-		panic(err)
+		return anime, err
 	}
 	anime.joinEpisodes(ep, es)
 	anime.filterInfos()
@@ -49,13 +53,16 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {
 	if len(ep) >= len(es) {
 		for i, e := range ep {
-			episode := Episode{Episode: e}
-			episode.Url = getOrEmpty(es, i)
+			episode := Episode{Episode: e, src: "www3.gogoanimes.fi", index: i}
+			episode.url = getOrEmpty(es, i)
 			a.episodes = append(a.episodes, episode)
 		}
 	} else {
-		for _, e := range es {
-			episode := Episode{Url: e}
+		for i, e := range es {
+			episode := Episode{url: e, src: "www3.gogoanimes.fi", index: i}
+			if i < len(ep) {
+				episode.Episode = ep[i]
+			}
 			a.episodes = append(a.episodes, episode)
 		}
 
@@ -119,6 +126,98 @@ func (a *Anime) filterInfos() {
 		}
 	}
 	a.Information = filtered
+}
+
+func (a *Anime) Sql() (anime []string, relations []string) {
+	var animeSql []string
+	animeSql = append(animeSql, qb.
+		Insert("anime_types").
+		Str("type_of", a.typeOf).
+		Sql())
+	animeSql = append(animeSql, qb.
+		Insert("seasons").
+		Str("season", a.season).
+		Str("value", a.seasonDate).
+		Sql())
+	animeSql = append(animeSql, qb.
+		Insert("animes").
+		Str("title", a.Title).
+		Str("mal_url", a.MalUrl).
+		Str("cover", a.ImgUrl).
+		Str("aired_from", getOrEmpty(a.aired, 0)).
+		Str("aired_to", getOrEmpty(a.aired, 1)).
+		SubQ("type_id", `select id from anime_types where type_of = '%v'`, a.typeOf).
+		SubQ("season_id", `select id from seasons where season = '%v'`, a.season).
+		Sql())
+	for _, title := range a.altTitles {
+		animeSql = append(animeSql, qb.
+			Insert("alt_title_types").
+			Str("type_of", title.lang).
+			Sql())
+		animeSql = append(animeSql, qb.
+			Insert("alt_titles").
+			SubQ("alt_title_type_id", `select id from alt_title_types where type_of = '%v'`, title.lang).
+			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
+			Str("alt_title", title.title).
+			Sql())
+	}
+	for _, info := range a.Information {
+		animeSql = append(animeSql, qb.
+			Insert("info_types").
+			Str("type_of", info.Key).
+			Sql())
+		animeSql = append(animeSql, qb.
+			Insert("infos").
+			Str("info", info.Value).
+			Sql())
+		animeSql = append(animeSql, qb.
+			Insert("anime_infos").
+			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
+			SubQ("info_id", `select id from infos where info = '%v'`, info.Value).
+			Sql())
+	}
+	for _, episode := range a.episodes {
+		animeSql = append(animeSql, qb.
+			Insert("streamm_sources").
+			Str("stream_source", episode.src).
+			Sql())
+		animeSql = append(animeSql, qb.
+			Insert("episodes").
+			Str("title", episode.Title).
+			Str("alt_title", episode.AltTitle).
+			Int("index_of", episode.index).
+			SubQ("anime_id", `select id from animes where mal_url`, a.MalUrl).
+			Sql())
+		animeSql = append(animeSql, qb.
+			Insert("episode_streams").
+			Str("stream", episode.url).
+			SubQRaw("episode_id", fmt.Sprintf(`
+			select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v`,
+				a.MalUrl, episode.index)).
+			SubQ("source_id", `select id from stream_sources where source = '%v'`, episode.src).
+			Sql())
+	}
+	var relationsSql []string
+	for _, r := range a.Related {
+		relationsSql = append(relationsSql, qb.
+			Insert("relation_types").
+			Str("type_of", r.TypeOf).
+			Sql())
+		relationsSql = append(relationsSql, qb.
+			Insert("relations").
+			SubQ("root_anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
+			SubQ("related_anime_id", `select id from animes where mal_url = '%v'`, r.Url).
+			SubQ("type_id", `select id from relation_types where type_of = '%v'`, r.TypeOf).
+			Sql())
+	}
+	return animeSql, relationsSql
+}
+
+func getOrEmpty(arr []string, i int) string {
+	if len(arr) > i {
+		return arr[i]
+	}
+	return ""
 }
 
 // type Episode struct {

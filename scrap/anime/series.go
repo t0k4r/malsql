@@ -67,10 +67,3 @@ package anime
 // 	}
 // 	return sql
 // }
-
-func getOrEmpty(arr []string, i int) string {
-	if len(arr) > i {
-		return arr[i]
-	}
-	return ""
-}

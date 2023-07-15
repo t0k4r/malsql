@@ -166,7 +166,7 @@ CREATE TABLE public.alt_titles (
 	anime_id int NOT NULL,
 	alt_title_type_id int NOT NULL,
 	alt_title varchar NOT NULL,
-	CONSTRAINT alt_titles_un UNIQUE (alt_title),
+	CONSTRAINT alt_titles_un UNIQUE (alt_title, anime_id, alt_title_type_id),
 	CONSTRAINT alt_titles_fk FOREIGN KEY (anime_id) REFERENCES public.animes(id),
 	CONSTRAINT alt_titles_fk_1 FOREIGN KEY (alt_title_type_id) REFERENCES public.alt_title_types(id)
 );
