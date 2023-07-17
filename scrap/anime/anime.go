@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type Episode struct {
@@ -37,35 +39,42 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 		return nil, err
 	}
 	anime := &Anime{Anime: ma}
-	ep, err := mal.GetEpisodes(anime.MalUrl)
-	if err != nil {
-		return anime, err
-	}
-	es, err := gogo.GetEpisodes(anime.Title)
-	if err != nil && err != gogo.ErrGoGo404 {
-		return anime, err
-	}
-	anime.joinEpisodes(ep, es)
+	g := new(errgroup.Group)
+	var EpTitles []mal.Episode
+	g.Go(func() error {
+		ep, err := mal.GetEpisodes(anime.MalUrl)
+		EpTitles = ep
+		return err
+	})
+	var EpStreams []string
+	g.Go(func() error {
+		es, err := gogo.GetEpisodes(anime.Title)
+		EpStreams = es
+		return err
+	})
+	anime.joinEpisodes(EpTitles, EpStreams)
 	anime.filterInfos()
-	return anime, nil
+	err = g.Wait()
+	return anime, err
 }
 
 func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {
 	if len(ep) >= len(es) {
+		a.episodes = make([]Episode, len(ep))
 		for i, e := range ep {
 			episode := Episode{Episode: e, src: "www3.gogoanimes.fi", index: i}
 			episode.url = getOrEmpty(es, i)
-			a.episodes = append(a.episodes, episode)
+			a.episodes[i] = episode
 		}
 	} else {
+		a.episodes = make([]Episode, len(es))
 		for i, e := range es {
 			episode := Episode{url: e, src: "www3.gogoanimes.fi", index: i}
 			if i < len(ep) {
 				episode.Episode = ep[i]
 			}
-			a.episodes = append(a.episodes, episode)
+			a.episodes[i] = episode
 		}
-
 	}
 }
 
@@ -192,8 +201,8 @@ func (a *Anime) Sql() (anime []string, relations []string) {
 			Insert("episode_streams").
 			Str("stream", episode.url).
 			SubQRaw("episode_id", fmt.Sprintf(`
-			select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v`,
-				a.MalUrl, episode.index)).
+			select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v
+			`, a.MalUrl, episode.index)).
 			SubQ("source_id", `select id from stream_sources where source = '%v'`, episode.src).
 			Sql())
 	}
