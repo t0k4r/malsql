@@ -39,15 +39,15 @@ func loadAnime[T int | string](id T) *anime.Anime {
 	case mal.ErrMal404:
 		return nil
 	case mal.ErrMal429:
-		fmt.Println("MalBlocked\b")
+		fmt.Println("\x1b[0;33mMalBlocked\x1b[0m")
 		mal.FixBlock()
 		return loadAnime(id)
 	case nil:
-		fmt.Printf("Scrapped: %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
+		fmt.Printf("\x1b[0;32mScrapped:\x1b[0m %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
 		return anime
 	default:
 		time.Sleep(time.Second * 5)
-		log.Printf("Error: %v\n\b", err)
+		log.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
 		return loadAnime(id)
 	}
 }
