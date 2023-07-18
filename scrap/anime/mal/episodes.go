@@ -16,7 +16,7 @@ func GetEpisodes(url string) ([]Episode, error) {
 	var episodes []Episode
 	res, err := http.Get(fmt.Sprintf("%v/episode", url))
 	if err != nil {
-		return episodes, err
+		return nil, err
 	}
 	if res.StatusCode == 429 {
 		return episodes, ErrMal429

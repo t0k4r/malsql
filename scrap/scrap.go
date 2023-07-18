@@ -1,8 +1,83 @@
 package scrap
 
 import (
+	"MalSql/scrap/anime"
+	"MalSql/scrap/anime/mal"
+	"fmt"
+	"log"
+	"time"
+
 	_ "github.com/lib/pq"
+	"golang.org/x/exp/slices"
 )
+
+type Scraper struct {
+	done []int
+}
+
+func New() Scraper {
+	return Scraper{}
+}
+
+func (s *Scraper) Run(start, end int) {
+	for i := start; i < end; i++ {
+		anime := loadAnime(i)
+		s.done = append(s.done, i)
+		if anime == nil {
+			continue
+		}
+		animes := s.loadRelated(anime)
+		fmt.Println(len(animes))
+	}
+}
+
+func loadAnime[T int | string](id T) *anime.Anime {
+	n := time.Now()
+	anime, err := anime.LoadAnime(id)
+	switch err {
+	case mal.ErrMal404:
+		return nil
+	case mal.ErrMal429:
+		fmt.Println("MalBlocked\b")
+		mal.FixBlock()
+		return loadAnime(id)
+	case nil:
+		fmt.Printf("Scrapped: %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
+		return anime
+	default:
+		time.Sleep(time.Second * 5)
+		log.Printf("Error: %v\n\b", err)
+		return loadAnime(id)
+	}
+}
+
+func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
+	// var wg sync.WaitGroup
+	var animes []*anime.Anime
+	animes = append(animes, root)
+	s.done = append(s.done, root.MagicNumber())
+	for _, related := range root.Related {
+		if slices.Contains(s.done, mal.MagicNumber(related.Url)) {
+			continue
+		}
+		anime := loadAnime(related.Url)
+		if anime != nil {
+			animes = append(animes, s.loadRelated(anime)...)
+		}
+		// wg.Add(1)
+		// func(related mal.Related) {
+		// 	if !slices.Contains(done, mal.MagicNumber(related.Url)) {
+		// 		anime := loadAnime(related.Url)
+		// 		if anime != nil && !slices.Contains(done, anime.MagicNumber()) {
+		// 			animes = append(animes, loadRelated(anime, done)...)
+		// 		}
+		// 	}
+		// 	// wg.Done()
+		// }(related)
+	}
+	// wg.Wait()
+	return animes
+}
 
 // type Scrapper struct {
 // 	wg          *sync.WaitGroup

@@ -1,8 +1,10 @@
 package main
 
 import (
-	"MalSql/scrap/anime"
+	"MalSql/scrap"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -12,11 +14,14 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-	a, err := anime.LoadAnime(1)
-	if err != nil {
-		log.Panic(err)
-	}
-	println(a.Title)
-	// s := scrap.New()
-	// s.Run(1, 69000)
+	s := scrap.New()
+	n := time.Now()
+	s.Run(21, 22)
+	fmt.Println(time.Since(n))
+	// n := time.Now()
+	// a, err := anime.LoadAnime(21)
+	// if err != nil {
+	// 	log.Panic(err)
+	// }
+	// fmt.Println(time.Since(n), a.Title)
 }
