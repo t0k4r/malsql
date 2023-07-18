@@ -3,53 +3,82 @@ package scrap
 import (
 	"MalSql/scrap/anime"
 	"MalSql/scrap/anime/mal"
+	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
+
+	_ "embed"
 
 	_ "github.com/lib/pq"
 	"golang.org/x/exp/slices"
 )
 
+//go:embed schema.sql
+var schema string
+
 type Scraper struct {
-	done []int
+	wg     sync.WaitGroup
+	done   []int
+	animes chan []*anime.Anime
+	db     *sql.DB
 }
 
-func New() Scraper {
-	return Scraper{}
+func New(db *sql.DB) Scraper {
+	for i, table := range strings.Split(schema, ";\n") {
+		_, err := db.Exec(table)
+		if err != nil {
+			log.Println(i)
+			log.Fatal(err)
+		}
+	}
+	return Scraper{
+		wg:     sync.WaitGroup{},
+		done:   []int{},
+		animes: make(chan []*anime.Anime),
+		db:     db,
+	}
 }
 
 func (s *Scraper) Run(start, end int) {
+	n := time.Now()
+	s.wg.Add(1)
+	go s.inserter()
 	for i := start; i < end; i++ {
+		if slices.Contains(s.done, i) {
+			continue
+		}
 		anime := loadAnime(i)
-		s.done = append(s.done, i)
 		if anime == nil {
 			continue
 		}
-		animes := s.loadRelated(anime)
-		fmt.Println(len(animes))
+		s.animes <- s.loadRelated(anime)
 	}
+	close(s.animes)
+	s.wg.Wait()
+	log.Printf("\x1b[0;34mStats:\x1b[0m %v animes \n\ttook %v\n", len(s.done), time.Since(n))
 }
 
-func loadAnime[T int | string](id T) *anime.Anime {
-	n := time.Now()
-	anime, err := anime.LoadAnime(id)
-	switch err {
-	case mal.ErrMal404:
-		return nil
-	case mal.ErrMal429:
-		fmt.Println("\x1b[0;33mMalBlocked\x1b[0m")
-		mal.FixBlock()
-		return loadAnime(id)
-	case nil:
-		fmt.Printf("\x1b[0;32mScrapped:\x1b[0m %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
-		return anime
-	default:
-		time.Sleep(time.Second * 5)
-		log.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
-		return loadAnime(id)
+func (s *Scraper) inserter() {
+	for animes := range s.animes {
+		var animesSql []string
+		var relationsSql []string
+		for _, anime := range animes {
+			aSql, rSql := anime.Sql()
+			animesSql = append(animesSql, aSql...)
+			relationsSql = append(relationsSql, rSql...)
+		}
+		for _, sql := range append(animesSql, relationsSql...) {
+			_, err := s.db.Exec(sql)
+			if err != nil {
+				log.Println(sql)
+				log.Panic(err)
+			}
+		}
 	}
+	s.wg.Done()
 }
 
 func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
@@ -74,6 +103,26 @@ func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
 	}
 	wg.Wait()
 	return animes
+}
+
+func loadAnime[T int | string](id T) *anime.Anime {
+	n := time.Now()
+	anime, err := anime.LoadAnime(id)
+	switch err {
+	case mal.ErrMal404:
+		return nil
+	case mal.ErrMal429:
+		fmt.Println("\x1b[0;33mMalBlocked!!!\x1b[0m")
+		mal.FixBlock()
+		return loadAnime(id)
+	case nil:
+		fmt.Printf("\x1b[0;32mScrapped:\x1b[0m %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
+		return anime
+	default:
+		time.Sleep(time.Second * 5)
+		log.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+		return loadAnime(id)
+	}
 }
 
 // type Scrapper struct {
