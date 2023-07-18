@@ -62,7 +62,6 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 }
 
 func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {
-	fmt.Println(len(ep), len(es))
 	if len(ep) >= len(es) {
 		a.Episodes = make([]Episode, len(ep))
 		for i, e := range ep {

@@ -5,6 +5,7 @@ import (
 	"MalSql/scrap/anime/mal"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -52,7 +53,7 @@ func loadAnime[T int | string](id T) *anime.Anime {
 }
 
 func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
-	// var wg sync.WaitGroup
+	var wg sync.WaitGroup
 	var animes []*anime.Anime
 	animes = append(animes, root)
 	s.done = append(s.done, root.MagicNumber())
@@ -60,22 +61,18 @@ func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
 		if slices.Contains(s.done, mal.MagicNumber(related.Url)) {
 			continue
 		}
-		anime := loadAnime(related.Url)
-		if anime != nil {
-			animes = append(animes, s.loadRelated(anime)...)
-		}
-		// wg.Add(1)
-		// func(related mal.Related) {
-		// 	if !slices.Contains(done, mal.MagicNumber(related.Url)) {
-		// 		anime := loadAnime(related.Url)
-		// 		if anime != nil && !slices.Contains(done, anime.MagicNumber()) {
-		// 			animes = append(animes, loadRelated(anime, done)...)
-		// 		}
-		// 	}
-		// 	// wg.Done()
-		// }(related)
+		wg.Add(1)
+		go func(related mal.Related) {
+			if !slices.Contains(s.done, mal.MagicNumber(related.Url)) {
+				anime := loadAnime(related.Url)
+				if anime != nil && !slices.Contains(s.done, anime.MagicNumber()) {
+					animes = append(animes, s.loadRelated(anime)...)
+				}
+			}
+			wg.Done()
+		}(related)
 	}
-	// wg.Wait()
+	wg.Wait()
 	return animes
 }
 
