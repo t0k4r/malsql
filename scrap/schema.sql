@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.relation_types (
 );
 
 CREATE TABLE IF NOT EXISTS public.seasons (
-	id serial NOT NULL DEFAULT
+	id serial NOT NULL,
 	season varchar NOT NULL,
 	value date NULL,
 	CONSTRAINT season_pk PRIMARY KEY (id),
