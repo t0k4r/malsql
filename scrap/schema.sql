@@ -78,12 +78,12 @@ CREATE TABLE IF NOT EXISTS public.infos (
 
 CREATE TABLE IF NOT EXISTS public.relations (
 	root_anime_id int NOT NULL,
-	related_aniem_id int NOT NULL,
+	related_anime_id int NOT NULL,
 	type_id int NOT NULL,
-	CONSTRAINT relations_un UNIQUE (root_anime_id, related_aniem_id, type_id),
+	CONSTRAINT relations_un UNIQUE (root_anime_id, related_anime_id, type_id),
 	CONSTRAINT relations_fk FOREIGN KEY (root_anime_id) REFERENCES public.animes(id),
 	CONSTRAINT relations_fk_1 FOREIGN KEY (type_id) REFERENCES public.relation_types(id),
-	CONSTRAINT relations_fkk FOREIGN KEY (related_aniem_id) REFERENCES public.animes(id)
+	CONSTRAINT relations_fkk FOREIGN KEY (related_anime_id) REFERENCES public.animes(id)
 );
 
 CREATE TABLE IF NOT EXISTS public.alt_titles (
