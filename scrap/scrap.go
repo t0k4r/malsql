@@ -73,8 +73,7 @@ func (s *Scraper) inserter() {
 		for _, sql := range append(animesSql, relationsSql...) {
 			_, err := s.db.Exec(sql)
 			if err != nil {
-				fmt.Println(sql)
-				log.Panic(err)
+				fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
 			}
 		}
 	}
