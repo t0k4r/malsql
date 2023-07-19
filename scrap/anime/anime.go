@@ -201,14 +201,16 @@ func (a *Anime) Sql() (anime []string, relations []string) {
 			Int("index_of", episode.index).
 			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
 			Sql())
-		animeSql = append(animeSql, qb.
-			Insert("episode_streams").
-			Str("stream", episode.url).
-			SubQRaw("episode_id", fmt.Sprintf(`
+		if episode.url != "" {
+			animeSql = append(animeSql, qb.
+				Insert("episode_streams").
+				Str("stream", episode.url).
+				SubQRaw("episode_id", fmt.Sprintf(`
 			select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v
 			`, a.MalUrl, episode.index)).
-			SubQ("source_id", `select id from stream_sources where stream_source = '%v'`, episode.src).
-			Sql())
+				SubQ("source_id", `select id from stream_sources where stream_source = '%v'`, episode.src).
+				Sql())
+		}
 	}
 	var relationsSql []string
 	for _, r := range a.Related {
