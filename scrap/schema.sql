@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.stream_sources (
 CREATE TABLE IF NOT EXISTS public.animes (
 	id serial NOT NULL,
 	title varchar NOT NULL,
+	description varchar NULL,
 	mal_url varchar NOT NULL,
 	cover varchar NULL,
 	type_id int NULL,

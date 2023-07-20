@@ -154,6 +154,7 @@ func (a *Anime) Sql() (anime []string, relations []string) {
 	animeSql = append(animeSql, qb.
 		Insert("animes").
 		Str("title", a.Title).
+		Str("description", a.Description).
 		Str("mal_url", a.MalUrl).
 		Str("cover", a.ImgUrl).
 		Str("aired_from", getOrEmpty(a.aired, 0)).
