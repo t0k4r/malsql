@@ -20,5 +20,5 @@ func main() {
 		log.Panic(err)
 	}
 	s := scrap.New(db)
-	s.Run(1, 100)
+	s.Run(1, 75000)
 }

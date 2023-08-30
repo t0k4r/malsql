@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS public.episode_streams (
 	stream varchar NOT NULL,
 	source_id int NOT NULL,
 	CONSTRAINT episode_streams_un UNIQUE (episode_id, source_id, stream),
+	CONSTRAINT episode_streams_un_1 UNIQUE (stream),
 	CONSTRAINT episode_streams_fk FOREIGN KEY (source_id) REFERENCES public.stream_sources(id),
 	CONSTRAINT episode_streams_fk_1 FOREIGN KEY (episode_id) REFERENCES public.episodes(id)
 );
