@@ -61,6 +61,22 @@ func (s *Scraper) Run(start, end int) {
 	fmt.Printf("\x1b[0;34mStats:\x1b[0m %v animes \n\ttook %v\n", len(s.done), time.Since(n))
 }
 
+func (s *Scraper) RunSkipDone(start, end int) {
+	rows, err := s.db.Query("select mal_url from animes")
+	if err != nil {
+		fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+	}
+	for rows.Next() {
+		var url string
+		err := rows.Scan(&url)
+		if err != nil {
+			fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+		}
+		s.done = append(s.done, mal.MagicNumber(url))
+	}
+	s.Run(start, end)
+}
+
 func (s *Scraper) inserter() {
 	for animes := range s.animes {
 		var animesSql []string
