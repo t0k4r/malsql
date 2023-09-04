@@ -2,9 +2,8 @@ package main
 
 import (
 	"MalSql/scrap"
-	"database/sql"
+	"flag"
 	"log"
-	"os"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -13,12 +12,14 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
-	db, err := sql.Open("postgres", os.Getenv("PG_CONN"))
-	if err != nil {
-		log.Panic(err)
-	}
-	s := scrap.New(db)
-	s.RunSkipDone(1, 75000)
+	start := flag.Int("start", 1, "start index")
+	end := flag.Int("end", 75000, "end index")
+	skip := flag.Bool("skip", false, "skip done animes")
+	file := flag.Bool("file", false, "dump to file not db")
+	flag.Parse()
+	s := scrap.New()
+	s.Run(scrap.Options{Start: *start, End: *end, Skip: *skip, File: *file})
+
 }

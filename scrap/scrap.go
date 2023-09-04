@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -26,27 +27,59 @@ type Scraper struct {
 	db     *sql.DB
 }
 
-func New(db *sql.DB) Scraper {
-	for i, table := range strings.Split(schema, ";\n") {
-		_, err := db.Exec(table)
-		if err != nil {
-			log.Println(i)
-			log.Fatal(err)
-		}
-	}
+type Options struct {
+	Start int
+	End   int
+	Skip  bool
+	File  bool
+}
+
+func New() Scraper {
 	return Scraper{
 		wg:     sync.WaitGroup{},
 		done:   []int{},
 		animes: make(chan []*anime.Anime),
-		db:     db,
+		db:     nil,
 	}
 }
 
-func (s *Scraper) Run(start, end int) {
+func (s *Scraper) Run(opts Options) {
 	n := time.Now()
+	if opts.Skip || !opts.File {
+		var err error
+		s.db, err = sql.Open("postgres", os.Getenv("PG_CONN"))
+		if err != nil {
+			log.Panic(err)
+		}
+		for i, table := range strings.Split(schema, ";\n") {
+			_, err := s.db.Exec(table)
+			if err != nil {
+				log.Println(i)
+				log.Fatal(err)
+			}
+		}
+	}
+	if opts.Skip {
+		rows, err := s.db.Query("select mal_url from animes")
+		if err != nil {
+			fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+		}
+		for rows.Next() {
+			var url string
+			err := rows.Scan(&url)
+			if err != nil {
+				fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+			}
+			s.done = append(s.done, mal.MagicNumber(url))
+		}
+	}
 	s.wg.Add(1)
-	go s.inserter()
-	for i := start; i < end; i++ {
+	if opts.File {
+		go s.dumper()
+	} else {
+		go s.inserter()
+	}
+	for i := opts.Start; i < opts.End; i++ {
 		if slices.Contains(s.done, i) {
 			continue
 		}
@@ -59,22 +92,6 @@ func (s *Scraper) Run(start, end int) {
 	close(s.animes)
 	s.wg.Wait()
 	fmt.Printf("\x1b[0;34mStats:\x1b[0m %v animes \n\ttook %v\n", len(s.done), time.Since(n))
-}
-
-func (s *Scraper) RunSkipDone(start, end int) {
-	rows, err := s.db.Query("select mal_url from animes")
-	if err != nil {
-		fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
-	}
-	for rows.Next() {
-		var url string
-		err := rows.Scan(&url)
-		if err != nil {
-			fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
-		}
-		s.done = append(s.done, mal.MagicNumber(url))
-	}
-	s.Run(start, end)
 }
 
 func (s *Scraper) inserter() {
@@ -90,6 +107,32 @@ func (s *Scraper) inserter() {
 			_, err := s.db.Exec(sql)
 			if err != nil {
 				fmt.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
+			}
+		}
+	}
+	s.wg.Done()
+}
+func (s *Scraper) dumper() {
+	file, err := os.Create("MalSql_dump.sql")
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = file.WriteString(schema)
+	if err != nil {
+		log.Panic(err)
+	}
+	for animes := range s.animes {
+		var animesSql []string
+		var relationsSql []string
+		for _, anime := range animes {
+			aSql, rSql := anime.Sql()
+			animesSql = append(animesSql, aSql...)
+			relationsSql = append(relationsSql, rSql...)
+		}
+		for _, sql := range append(animesSql, relationsSql...) {
+			_, err := file.WriteString(fmt.Sprintf("%v;\n", sql))
+			if err != nil {
+				log.Panic(err)
 			}
 		}
 	}
