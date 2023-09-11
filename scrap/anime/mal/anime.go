@@ -67,10 +67,14 @@ func LoadAnime[T string | int](url T) (*Anime, error) {
 			key := strings.Replace(strings.ToLower(s.ChildrenFiltered(`span.dark_text`).Text()), ":", "", 1)
 			var values []string
 			s.ChildrenFiltered(`a`).Each(func(i int, s *goquery.Selection) {
-				values = append(values, s.Text())
+				txt := s.Text()
+				txt = strings.Join(strings.Fields(txt), " ")
+				values = append(values, txt)
 			})
 			if len(values) == 0 {
-				values = append(values, strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n "))
+				txt := s.Text()
+				txt = strings.Join(strings.Fields(txt), " ")
+				values = append(values, strings.Trim(strings.Join(strings.Split(txt, ":")[1:], ":"), "\n "))
 			}
 			for _, v := range values {
 				anime.Information = append(anime.Information, Info{
@@ -82,6 +86,7 @@ func LoadAnime[T string | int](url T) (*Anime, error) {
 		doc.Find(`.js-alternative-titles>.spaceit_pad`).Each(func(i int, s *goquery.Selection) {
 			key := strings.Replace(strings.ToLower(s.ChildrenFiltered(`span.dark_text`).Text()), ":", "", 1)
 			value := strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n ")
+			value = strings.Join(strings.Fields(value), " ")
 			anime.Information = append(anime.Information, Info{
 				Key:   key,
 				Value: value,
