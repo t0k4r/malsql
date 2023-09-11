@@ -18,8 +18,9 @@ func main() {
 	end := flag.Int("end", 75000, "end index")
 	skip := flag.Bool("skip", false, "skip done animes")
 	file := flag.Bool("file", false, "dump to file not db")
+	quick := flag.Bool("quick", false, "faster but very inefficient")
 	flag.Parse()
 	s := scrap.New()
-	s.Run(scrap.Options{Start: *start, End: *end, Skip: *skip, File: *file})
+	s.Run(scrap.Options{Start: *start, End: *end, Skip: *skip, File: *file, Quick: *quick})
 
 }

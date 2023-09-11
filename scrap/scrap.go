@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ type Options struct {
 	End   int
 	Skip  bool
 	File  bool
+	Quick bool
 }
 
 func New() Scraper {
@@ -74,13 +76,35 @@ func (s *Scraper) Run(opts Options) {
 		}
 	}
 	s.wg.Add(1)
+
 	if opts.File {
-		go s.dumper()
+		go s.dumper(opts.Quick)
 	} else {
-		go s.inserter()
+		go s.inserter(opts.Quick)
+	}
+	iChan := make(chan int)
+	var qwg sync.WaitGroup
+	if opts.Quick {
+		for i := 0; i < runtime.NumCPU(); i++ {
+			qwg.Add(1)
+			go func() {
+				for i := range iChan {
+					anime := loadAnime(i)
+					if anime == nil {
+						continue
+					}
+					s.animes <- s.loadRelated(anime)
+				}
+				qwg.Done()
+			}()
+		}
 	}
 	for i := opts.Start; i < opts.End; i++ {
 		if slices.Contains(s.done, i) {
+			continue
+		}
+		if opts.Quick {
+			iChan <- i
 			continue
 		}
 		anime := loadAnime(i)
@@ -89,13 +113,30 @@ func (s *Scraper) Run(opts Options) {
 		}
 		s.animes <- s.loadRelated(anime)
 	}
+	close(iChan)
+
+	qwg.Wait()
 	close(s.animes)
 	s.wg.Wait()
-	fmt.Printf("\x1b[0;34mStats:\x1b[0m %v animes \n\ttook %v\n", len(s.done), time.Since(n))
+	fmt.Printf("\x1b[0;34mStats:\x1b[0m %v animes(%v unique) \n\ttook %v\n", len(s.done), uniqueLen(s.done), time.Since(n))
+}
+func uniqueLen(s []int) int {
+	var u []int
+	for _, i := range s {
+		if !slices.Contains(u, i) {
+			u = append(u, i)
+		}
+	}
+	return len(u)
 }
 
-func (s *Scraper) inserter() {
+func (s *Scraper) inserter(fast bool) {
 	for animes := range s.animes {
+		if fast {
+			for _, anime := range animes {
+				s.done = append(s.done, anime.MagicNumber())
+			}
+		}
 		var animesSql []string
 		var relationsSql []string
 		for _, anime := range animes {
@@ -112,7 +153,7 @@ func (s *Scraper) inserter() {
 	}
 	s.wg.Done()
 }
-func (s *Scraper) dumper() {
+func (s *Scraper) dumper(fast bool) {
 	file, err := os.Create("MalSql_dump.sql")
 	if err != nil {
 		log.Fatal(err)
@@ -122,6 +163,11 @@ func (s *Scraper) dumper() {
 		log.Panic(err)
 	}
 	for animes := range s.animes {
+		if fast {
+			for _, anime := range animes {
+				s.done = append(s.done, anime.MagicNumber())
+			}
+		}
 		var animesSql []string
 		var relationsSql []string
 		for _, anime := range animes {
