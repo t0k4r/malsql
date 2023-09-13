@@ -9,6 +9,9 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -18,6 +21,8 @@ import (
 var schema string
 
 var DB *sql.DB
+
+var File *os.File
 
 type Options struct {
 	Start int
@@ -32,25 +37,133 @@ type Scraper interface {
 }
 
 func New(opt Options) Scraper {
+	var done []int
+	var err error
 	if !opt.File {
-		var err error
 		DB, err = sql.Open("postgres", os.Getenv("PG_CONN"))
 		if err != nil {
 			log.Panic(err)
 		}
+		for _, sql := range strings.Split(schema, ";\n") {
+			_, err = DB.Exec(sql)
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		if opt.Skip {
+			rows, err := DB.Query("select mal_url from animes")
+			if err != nil {
+				slog.Error(err.Error())
+			}
+			for rows.Next() {
+				var url string
+				err := rows.Scan(&url)
+				if err != nil {
+					slog.Error(err.Error())
+				}
+				done = append(done, mal.MagicNumber(url))
+			}
+		}
+	} else {
+		File, err = os.Create("MalSql_dump.sql")
+		if err != nil {
+			log.Panic(err)
+		}
+		_, err = File.WriteString(schema)
+		if err != nil {
+			log.Panic(err)
+		}
 	}
+
 	if opt.Quick {
-		return &fastScrap{opt}
+		return &fastScrap{Options: opt}
 	}
-	return &goodScrap{opt}
+	return &goodScrap{
+		Options: opt,
+		wg:      sync.WaitGroup{},
+		animes:  make(chan []*anime.Anime),
+		done:    done,
+	}
 }
 
 type goodScrap struct {
 	Options
+	wg     sync.WaitGroup
+	animes chan []*anime.Anime
+	done   []int
+}
+
+func (s *goodScrap) dumper() {
+	for animes := range s.animes {
+		var relations []string
+		for _, anime := range animes {
+			asql, rsql := anime.Sql()
+			relations = append(relations, rsql...)
+			_, err := File.WriteString(strings.Join(asql, "\n"))
+			if err != nil {
+				slog.Error(err.Error())
+			}
+		}
+		for _, rsql := range relations {
+			_, err := File.WriteString(rsql)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+		}
+	}
+	s.wg.Done()
+}
+
+func (s *goodScrap) inserter() {
+	for animes := range s.animes {
+		var relationsSql []string
+		var animesSql []string
+		for _, anime := range animes {
+			asql, rsql := anime.Sql()
+			relationsSql = append(relationsSql, rsql...)
+			animesSql = append(animesSql, asql...)
+		}
+		for _, asql := range animesSql {
+			_, err := DB.Exec(asql)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+		}
+		for _, rsql := range relationsSql {
+			_, err := DB.Exec(rsql)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+		}
+	}
+	s.wg.Done()
 }
 
 func (s *goodScrap) Run() {
-	fmt.Println("good")
+	if s.File {
+		s.wg.Add(1)
+		go s.dumper()
+	} else {
+		s.wg.Add(1)
+		go s.inserter()
+	}
+	n := time.Now()
+	for i := s.Start; i < s.End; i++ {
+		if slices.Contains(s.done, i) {
+			continue
+		}
+		anime := loadAnime(i)
+		if anime == nil {
+			continue
+		}
+		var series series
+		series.load(anime)
+		s.done = append(s.done, series.done...)
+		s.animes <- series.animes
+	}
+	close(s.animes)
+	s.wg.Wait()
+	slog.Info("Done", "animes", len(s.done), "took", time.Since(n))
 }
 
 type fastScrap struct {
@@ -218,36 +331,32 @@ func (s *fastScrap) Run() {
 // 	s.wg.Done()
 // }
 
-// func (s *Scraper) loadRelated(root *anime.Anime) []*anime.Anime {
-// 	var wg sync.WaitGroup
-// 	var animes []*anime.Anime
-// 	animes = append(animes, root)
-// 	s.done = append(s.done, root.MagicNumber())
-// 	for _, related := range root.Related {
-// 		if slices.Contains(s.done, mal.MagicNumber(related.Url)) {
-// 			continue
-// 		}
-// 		wg.Add(1)
-// 		go func(related mal.Related) {
-// 			if !slices.Contains(s.done, mal.MagicNumber(related.Url)) {
-// 				anime := loadAnime(related.Url)
-// 				if anime != nil && !slices.Contains(s.done, anime.MagicNumber()) {
-// 					animes = append(animes, s.loadRelated(anime)...)
-// 				}
-// 			}
-// 			wg.Done()
-// 		}(related)
-// 	}
-// 	wc := make(chan any)
-// 	go func() {
-// 		wg.Wait()
-// 		wc <- nil
-// 	}()
-// 	select {
-// 	case <-wc:
-// 	}
-// 	return animes
-// }
+type series struct {
+	done   []int
+	animes []*anime.Anime
+}
+
+func (s *series) load(root *anime.Anime) {
+	var wg sync.WaitGroup
+	s.animes = append(s.animes, root)
+	s.done = append(s.done, root.MagicNumber())
+	for _, r := range root.Related {
+		if slices.Contains(s.done, mal.MagicNumber(r.Url)) {
+			continue
+		}
+		wg.Add(1)
+		go func(r mal.Related) {
+			anime := loadAnime(r.Url)
+			if anime != nil && !slices.Contains(s.done, anime.MagicNumber()) {
+				s.load(anime)
+			}
+			wg.Done()
+		}(r)
+
+	}
+	wg.Wait()
+
+}
 
 func loadAnime[T int | string](id T) *anime.Anime {
 	n := time.Now()
@@ -257,17 +366,14 @@ func loadAnime[T int | string](id T) *anime.Anime {
 		return nil
 	case mal.ErrMal429:
 		slog.Warn("MalBlocked")
-		// fmt.Println("\x1b[0;33mMalBlocked!!!\x1b[0m")
 		mal.FixBlock()
 		return loadAnime(id)
 	case nil:
 		slog.Info("Scrapped", "anime", anime.Title, "episodes", len(anime.Episodes), "took", time.Since(n))
-		// fmt.Printf("\x1b[0;32mScrapped:\x1b[0m %v\n\t%v episodes\n\ttook %v\n", anime.Title, len(anime.Episodes), time.Since(n))
 		return anime
 	default:
 		time.Sleep(time.Second * 5)
 		slog.Error(err.Error())
-		// log.Printf("\x1b[0;31mError:\x1b[0m %v\n", err)
 		return loadAnime(id)
 	}
 }
