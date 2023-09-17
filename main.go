@@ -3,24 +3,23 @@ package main
 import (
 	"MalSql/scrap"
 	"flag"
-	"log"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"golang.org/x/exp/slog"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println(err)
+		slog.Info(err.Error())
 	}
-	start := flag.Int("start", 1, "start index")
-	end := flag.Int("end", 75000, "end index")
-	skip := flag.Bool("skip", false, "skip done animes")
-	file := flag.Bool("file", false, "dump to file not db")
-	quick := flag.Bool("quick", false, "faster but very inefficient")
+	var opts scrap.Options
+	flag.IntVar(&opts.Start, "start", 1, "start index")
+	flag.IntVar(&opts.End, "end", 75000, "end index")
+	flag.BoolVar(&opts.Skip, "skip", false, "skip done animes")
+	flag.BoolVar(&opts.File, "file", false, "dump to file not db")
+	flag.BoolVar(&opts.Quick, "quick", false, "faster but very inefficient")
 	flag.Parse()
-	s := scrap.New()
-	s.Run(scrap.Options{Start: *start, End: *end, Skip: *skip, File: *file, Quick: *quick})
-
+	scrap.New(opts).Run()
 }
