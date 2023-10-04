@@ -1,10 +1,11 @@
 module MalSql
 
-go 1.20
+go 1.21.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/go-rod/rod v0.113.3
+	github.com/t0k4r/qb v0.0.0-20231003194851-2ac1ad6969bb
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 )
 
