@@ -26,11 +26,15 @@ var DB *sql.DB
 var File *os.File
 
 type Options struct {
-	Start int
-	End   int
-	Skip  bool
-	File  bool
-	Quick bool
+	Start   int
+	End     int
+	Skip    bool
+	File    bool
+	Quick   bool
+	Update  bool
+	Dialect string
+	Conn    string
+	Env     bool
 }
 
 type Scraper interface {
