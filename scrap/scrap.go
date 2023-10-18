@@ -15,11 +15,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/t0k4r/qb"
 )
 
-//go:embed schema.sql
-var schema string
+//go:embed pg_schema.sql
+var pgSchema string
+
+//go:embed sqlite_schema.sql
+var sqliteSchema string
 
 var DB *sql.DB
 
@@ -37,6 +43,15 @@ type Options struct {
 	Env     bool
 }
 
+func (o Options) onC() qb.Conflict {
+	if o.Update {
+		return qb.Replace
+	} else {
+		return qb.Replace
+		// return qb.Ignore
+	}
+}
+
 type Scraper interface {
 	Run()
 	inserter()
@@ -46,10 +61,26 @@ type Scraper interface {
 func New(opt Options) Scraper {
 	var done []int
 	var err error
+	if opt.Env {
+		err := godotenv.Load()
+		if err != nil {
+			slog.Error(err.Error())
+		}
+		opt.Conn = os.Getenv("MALSQL_DB")
+	}
+	if strings.Contains("psotgres", opt.Dialect) {
+		qb.DefaultDialect = qb.Postgres
+	} else {
+		qb.DefaultDialect = qb.Sqlite
+	}
 	if !opt.File {
-		DB, err = sql.Open("postgres", os.Getenv("PG_CONN"))
+		DB, err = sql.Open(opt.Dialect, opt.Conn)
 		if err != nil {
 			log.Panic(err)
+		}
+		schema := sqliteSchema
+		if strings.Contains(opt.Dialect, "postgres") {
+			schema = pgSchema
 		}
 		for _, sql := range strings.Split(schema, ";\n") {
 			_, err = DB.Exec(sql)
@@ -75,6 +106,10 @@ func New(opt Options) Scraper {
 		File, err = os.Create("MalSql_dump.sql")
 		if err != nil {
 			log.Panic(err)
+		}
+		schema := sqliteSchema
+		if strings.Contains(opt.Dialect, "postgres") {
+			schema = pgSchema
 		}
 		_, err = File.WriteString(schema)
 		if err != nil {
@@ -110,11 +145,15 @@ func (s *goodScrap) dumper() {
 	for animes := range s.animes {
 		var relations []string
 		for _, anime := range animes {
-			asql, rsql := anime.Sql()
-			relations = append(relations, rsql...)
-			_, err := File.WriteString(strings.Join(asql, "\n"))
-			if err != nil {
-				slog.Error(err.Error())
+			asql, rsql := anime.Nsql()
+			for _, r := range rsql {
+				relations = append(relations, r.Sql(s.onC())+";\n")
+			}
+			for _, a := range asql {
+				_, err := File.WriteString(a.Sql(s.onC()) + ";\n")
+				if err != nil {
+					slog.Error(err.Error())
+				}
 			}
 		}
 		for _, rsql := range relations {

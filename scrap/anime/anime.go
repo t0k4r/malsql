@@ -241,10 +241,13 @@ func (a *Anime) Nsql() ([]qb.QInsert, []qb.QInsert) {
 	anime = append(anime, qb.
 		Insert("anime_types").
 		Col("type_of", a.typeOf))
-	anime = append(anime, qb.
-		Insert("seasons").
-		Col("season", a.season).
-		Col("value", a.seasonDate))
+	if a.season != "" {
+		anime = append(anime, qb.
+			Insert("seasons").
+			Col("season", a.season).
+			Col("value", a.seasonDate))
+	}
+
 	anime = append(anime, qb.
 		Insert("animes").
 		Col("title", a.Title).
@@ -318,7 +321,8 @@ func (a *Anime) Nsql() ([]qb.QInsert, []qb.QInsert) {
 				Col("stream", episode.url).
 				Col("episode_id", qb.
 					Select("episodes e").
-					Wheref("e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v",
+					Cols("id").
+					Wheref("e.anime_id = (select id from animes where mal_url = '%v' and e.index_of = %v)",
 						a.MalUrl, episode.index)).
 				Col("source_id", qb.
 					Select("stream_sources").
