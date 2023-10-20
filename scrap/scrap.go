@@ -32,23 +32,22 @@ var DB *sql.DB
 var File *os.File
 
 type Options struct {
-	Start   int
-	End     int
-	Skip    bool
-	File    bool
-	Quick   bool
-	Update  bool
-	Dialect string
-	Conn    string
-	Env     bool
+	Start  int
+	End    int
+	Skip   bool
+	File   bool
+	Quick  bool
+	Update bool
+	Driver string
+	Conn   string
+	Env    bool
 }
 
 func (o Options) onC() qb.Conflict {
 	if o.Update {
 		return qb.Replace
 	} else {
-		return qb.Replace
-		// return qb.Ignore
+		return qb.Ignore
 	}
 }
 
@@ -68,18 +67,13 @@ func New(opt Options) Scraper {
 		}
 		opt.Conn = os.Getenv("MALSQL_DB")
 	}
-	if strings.Contains("psotgres", opt.Dialect) {
-		qb.DefaultDialect = qb.Postgres
-	} else {
-		qb.DefaultDialect = qb.Sqlite
-	}
 	if !opt.File {
-		DB, err = sql.Open(opt.Dialect, opt.Conn)
+		DB, err = sql.Open(opt.Driver, opt.Conn)
 		if err != nil {
 			log.Panic(err)
 		}
 		schema := sqliteSchema
-		if strings.Contains(opt.Dialect, "postgres") {
+		if strings.Contains(opt.Driver, "postgres") {
 			schema = pgSchema
 		}
 		for _, sql := range strings.Split(schema, ";\n") {
@@ -108,7 +102,7 @@ func New(opt Options) Scraper {
 			log.Panic(err)
 		}
 		schema := sqliteSchema
-		if strings.Contains(opt.Dialect, "postgres") {
+		if strings.Contains(opt.Driver, "postgres") {
 			schema = pgSchema
 		}
 		_, err = File.WriteString(schema)
@@ -168,20 +162,21 @@ func (s *goodScrap) dumper() {
 
 func (s *goodScrap) inserter() {
 	for animes := range s.animes {
-		var relationsSql []string
-		var animesSql []string
+		var relations []string
 		for _, anime := range animes {
-			asql, rsql := anime.Sql()
-			relationsSql = append(relationsSql, rsql...)
-			animesSql = append(animesSql, asql...)
-		}
-		for _, asql := range animesSql {
-			_, err := DB.Exec(asql)
-			if err != nil {
-				slog.Error(err.Error())
+			asql, rsql := anime.Nsql()
+			for _, r := range rsql {
+				relations = append(relations, r.Sql(s.onC()))
+			}
+			for _, a := range asql {
+				sql := a.Sql(s.onC())
+				_, err := DB.Exec(sql)
+				if err != nil {
+					slog.Error(err.Error())
+				}
 			}
 		}
-		for _, rsql := range relationsSql {
+		for _, rsql := range relations {
 			_, err := DB.Exec(rsql)
 			if err != nil {
 				slog.Error(err.Error())
@@ -228,14 +223,20 @@ type fastScrap struct {
 
 func (s *fastScrap) dumper() {
 	for animes := range s.animes {
+		for _, a := range animes {
+			s.inserted = append(s.inserted, a.MagicNumber())
+		}
 		var relations []string
 		for _, anime := range animes {
-			s.inserted = append(s.inserted, anime.MagicNumber())
-			asql, rsql := anime.Sql()
-			relations = append(relations, rsql...)
-			_, err := File.WriteString(strings.Join(asql, "\n"))
-			if err != nil {
-				slog.Error(err.Error())
+			asql, rsql := anime.Nsql()
+			for _, r := range rsql {
+				relations = append(relations, r.Sql(s.onC())+";\n")
+			}
+			for _, a := range asql {
+				_, err := File.WriteString(a.Sql(s.onC()) + ";\n")
+				if err != nil {
+					slog.Error(err.Error())
+				}
 			}
 		}
 		for _, rsql := range relations {
@@ -250,21 +251,24 @@ func (s *fastScrap) dumper() {
 
 func (s *fastScrap) inserter() {
 	for animes := range s.animes {
-		var relationsSql []string
-		var animesSql []string
-		for _, anime := range animes {
-			s.inserted = append(s.inserted, anime.MagicNumber())
-			asql, rsql := anime.Sql()
-			relationsSql = append(relationsSql, rsql...)
-			animesSql = append(animesSql, asql...)
+		for _, a := range animes {
+			s.inserted = append(s.inserted, a.MagicNumber())
 		}
-		for _, asql := range animesSql {
-			_, err := DB.Exec(asql)
-			if err != nil {
-				slog.Error(err.Error())
+		var relations []string
+		for _, anime := range animes {
+			asql, rsql := anime.Nsql()
+			for _, r := range rsql {
+				relations = append(relations, r.Sql(s.onC()))
+			}
+			for _, a := range asql {
+				sql := a.Sql(s.onC())
+				_, err := DB.Exec(sql)
+				if err != nil {
+					slog.Error(err.Error())
+				}
 			}
 		}
-		for _, rsql := range relationsSql {
+		for _, rsql := range relations {
 			_, err := DB.Exec(rsql)
 			if err != nil {
 				slog.Error(err.Error())

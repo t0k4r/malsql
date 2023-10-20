@@ -17,7 +17,7 @@ func main() {
 	flag.BoolVar(&opts.File, "file", false, "dump to sql file not database")
 	flag.BoolVar(&opts.Skip, "skip", false, "skip done animes (not availible if -file)")
 	flag.BoolVar(&opts.Update, "update", false, "on conflict update/replace")
-	flag.StringVar(&opts.Dialect, "dialect", "sqlite", "postgres or sqlite3")
+	flag.StringVar(&opts.Driver, "driver", "sqlite3", "postgres or sqlite3")
 	flag.StringVar(&opts.Conn, "conn", "./MalSql.sqlite", "database connection string")
 	flag.BoolVar(&opts.Env, "env", false, "read database connection from env (MALSQL_DB)")
 	flag.Parse()

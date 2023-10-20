@@ -1,3 +1,4 @@
 .env
 MalSql
 MalSql_dump.sql
+MalSql.sqlite

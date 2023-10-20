@@ -5,7 +5,7 @@ go 1.21.1
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/go-rod/rod v0.113.3
-	github.com/t0k4r/qb v0.0.0-20231017204552-ed6f36774043
+	github.com/t0k4r/qb v0.0.0-20231020220350-ae03ebc3f18a
 )
 
 require (
