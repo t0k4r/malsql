@@ -3,8 +3,9 @@ package anime
 import (
 	"MalSql/scrap/anime/gogo"
 	"MalSql/scrap/anime/mal"
-	oqb "MalSql/scrap/anime/qb"
-	"fmt"
+
+	// oqb "MalSql/scrap/anime/qb"
+
 	"strings"
 	"time"
 
@@ -142,97 +143,6 @@ func (a *Anime) filterInfos() {
 		}
 	}
 	a.Information = filtered
-}
-
-func (a *Anime) Sql() (anime []string, relations []string) {
-	var animeSql []string
-
-	animeSql = append(animeSql, oqb.
-		Insert("anime_types").
-		Str("type_of", a.typeOf).
-		Sql())
-	animeSql = append(animeSql, oqb.
-		Insert("seasons").
-		Str("season", a.season).
-		Str("value", a.seasonDate).
-		Sql())
-	animeSql = append(animeSql, oqb.
-		Insert("animes").
-		Str("title", a.Title).
-		Str("description", a.Description).
-		Str("mal_url", a.MalUrl).
-		Str("cover", a.ImgUrl).
-		Str("aired_from", getOrEmpty(a.aired, 0)).
-		Str("aired_to", getOrEmpty(a.aired, 1)).
-		SubQ("type_id", `select id from anime_types where type_of = '%v'`, a.typeOf).
-		SubQ("season_id", `select id from seasons where season = '%v'`, a.season).
-		Sql())
-	for _, title := range a.altTitles {
-		animeSql = append(animeSql, oqb.
-			Insert("alt_title_types").
-			Str("type_of", title.lang).
-			Sql())
-		animeSql = append(animeSql, oqb.
-			Insert("alt_titles").
-			SubQ("alt_title_type_id", `select id from alt_title_types where type_of = '%v'`, title.lang).
-			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
-			Str("alt_title", title.title).
-			Sql())
-	}
-	for _, info := range a.Information {
-		animeSql = append(animeSql, oqb.
-			Insert("info_types").
-			Str("type_of", info.Key).
-			Sql())
-		animeSql = append(animeSql, oqb.
-			Insert("infos").
-			Str("info", info.Value).
-			SubQ("type_id", `select id from info_types where type_of = '%v'`, info.Key).
-			Sql())
-		animeSql = append(animeSql, oqb.
-			Insert("anime_infos").
-			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
-			SubQ("info_id", `select id from infos where info = '%v'`, info.Value).
-			Sql())
-	}
-	for _, episode := range a.Episodes {
-		animeSql = append(animeSql, oqb.
-			Insert("stream_sources").
-			Str("stream_source", episode.src).
-			Sql())
-		animeSql = append(animeSql, oqb.
-			Insert("episodes").
-			Str("title", episode.Title).
-			Str("alt_title", episode.AltTitle).
-			Int("index_of", episode.index).
-			SubQ("anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
-			Sql())
-		if episode.url != "" {
-			animeSql = append(animeSql, oqb.
-				Insert("episode_streams").
-				Str("stream", episode.url).
-				SubQRaw("episode_id", fmt.Sprintf(`
-			select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v') and e.index_of = %v
-			`, a.MalUrl, episode.index)).
-				SubQ("source_id", `select id from stream_sources where stream_source = '%v'`, episode.src).
-				Sql())
-		}
-	}
-	var relationsSql []string
-
-	for _, r := range a.Related {
-		relationsSql = append(relationsSql, oqb.
-			Insert("relation_types").
-			Str("type_of", r.TypeOf).
-			Sql())
-		relationsSql = append(relationsSql, oqb.
-			Insert("relations").
-			SubQ("root_anime_id", `select id from animes where mal_url = '%v'`, a.MalUrl).
-			SubQ("related_anime_id", `select id from animes where mal_url = '%v'`, r.Url).
-			SubQ("type_id", `select id from relation_types where type_of = '%v'`, r.TypeOf).
-			Sql())
-	}
-	return animeSql, relationsSql
 }
 
 // anime, relations
