@@ -4,8 +4,6 @@ import (
 	"MalSql/scrap/anime/gogo"
 	"MalSql/scrap/anime/mal"
 
-	// oqb "MalSql/scrap/anime/qb"
-
 	"strings"
 	"time"
 
@@ -146,7 +144,7 @@ func (a *Anime) filterInfos() {
 }
 
 // anime, relations
-func (a *Anime) Nsql() ([]qb.QInsert, []qb.QInsert) {
+func (a *Anime) Sql() ([]qb.QInsert, []qb.QInsert) {
 	var anime []qb.QInsert
 	anime = append(anime, qb.
 		Insert("anime_types").
