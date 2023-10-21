@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"errors"
 	"log"
 	"log/slog"
 	"os"
@@ -75,6 +76,14 @@ func New(opt Options) Scraper {
 		schema := sqliteSchema
 		if strings.Contains(opt.Driver, "postgres") {
 			schema = pgSchema
+		} else {
+			if _, err := os.Stat("/path/to/whatever"); errors.Is(err, os.ErrNotExist) {
+				f, err := os.Create(opt.Conn)
+				if err != nil {
+					log.Panic(err)
+				}
+				f.Close()
+			}
 		}
 		for _, sql := range strings.Split(schema, ";\n") {
 			_, err = DB.Exec(sql)
