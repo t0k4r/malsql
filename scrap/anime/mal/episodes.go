@@ -17,7 +17,6 @@ func GetEpisodes(url string) ([]Episode, error) {
 	offset := 0
 	for {
 		var newEpisodes []Episode
-
 		res, err := http.Get(fmt.Sprintf("%v/episode?offset=%v", url, offset))
 		if err != nil {
 			return nil, err
@@ -32,8 +31,12 @@ func GetEpisodes(url string) ([]Episode, error) {
 		doc.Find(`td.episode-title .fl-l`).Each(func(i int, s *goquery.Selection) {
 			newEpisodes = append(newEpisodes, Episode{Title: s.Text()})
 		})
-		doc.Find(`td.episode-title di-ib`).Each(func(i int, s *goquery.Selection) {
-			newEpisodes[i].AltTitle = s.Text()
+		doc.Find(`td.episode-title .di-ib`).Each(func(i int, s *goquery.Selection) {
+			if len(newEpisodes) > i {
+				newEpisodes[i].AltTitle = s.Text()
+			} else {
+				newEpisodes = append(newEpisodes, Episode{AltTitle: s.Text()})
+			}
 		})
 		if len(newEpisodes) == 0 {
 			break

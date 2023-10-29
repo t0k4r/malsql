@@ -24,7 +24,7 @@ type Title struct {
 }
 
 type Anime struct {
-	*mal.Anime
+	mal.Anime
 	Episodes   []Episode
 	typeOf     string
 	season     string
