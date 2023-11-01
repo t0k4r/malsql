@@ -73,7 +73,8 @@ func New(opt Options) Scraper {
 		if strings.Contains(opt.Driver, "postgres") {
 			schema = pgSchema
 		} else {
-			if _, err := os.Stat("/path/to/whatever"); errors.Is(err, os.ErrNotExist) {
+			_, err := os.Stat(opt.Conn)
+			if errors.Is(err, os.ErrNotExist) {
 				f, err := os.Create(opt.Conn)
 				if err != nil {
 					log.Panic(err)

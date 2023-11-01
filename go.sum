@@ -12,6 +12,8 @@ github.com/mattn/go-sqlite3 v1.14.17 h1:mCRHCLDUBXgpKAqIKsaAaAsrAlbkeomtRFKXh2L6
 github.com/mattn/go-sqlite3 v1.14.17/go.mod h1:2eHXhiwb8IkHr+BDWZGa96P6+rkvnG63S2DGjv9HUNg=
 github.com/t0k4r/qb v0.0.0-20231020220350-ae03ebc3f18a h1:sWBuEZtBAsoeyMkXkW9YfouEIHJOTe5ZTdYsjbHXMdI=
 github.com/t0k4r/qb v0.0.0-20231020220350-ae03ebc3f18a/go.mod h1:ins/BVwghkK/eHD4t+keQNqTuso9gOnB2AkM/CxEXac=
+github.com/t0k4r/qb v0.0.0-20231020224937-d816cb10ec57 h1:9u/Q+gPmOK0Sl0WsPz1bpX6C0WlGZdVjWyZapw17LUI=
+github.com/t0k4r/qb v0.0.0-20231020224937-d816cb10ec57/go.mod h1:ins/BVwghkK/eHD4t+keQNqTuso9gOnB2AkM/CxEXac=
 github.com/ysmood/fetchup v0.2.3 h1:ulX+SonA0Vma5zUFXtv52Kzip/xe7aj4vqT5AJwQ+ZQ=
 github.com/ysmood/fetchup v0.2.3/go.mod h1:xhibcRKziSvol0H1/pj33dnKrYyI2ebIvz5cOOkYGns=
 github.com/ysmood/goob v0.4.0 h1:HsxXhyLBeGzWXnqVKtmT9qM7EuVs/XOgkX7T6r1o1AQ=
