@@ -33,12 +33,12 @@ type Anime struct {
 	altTitles  []Title
 }
 
-func LoadAnime[T string | int](malUrl T) (*Anime, error) {
+func LoadAnime[T string | int](malUrl T) (Anime, error) {
 	ma, err := mal.LoadAnime(malUrl)
+	anime := Anime{Anime: ma}
 	if err != nil {
-		return nil, err
+		return anime, err
 	}
-	anime := &Anime{Anime: ma}
 	g := new(errgroup.Group)
 	var EpTitles []mal.Episode
 	g.Go(func() error {
