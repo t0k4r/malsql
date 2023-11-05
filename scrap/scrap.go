@@ -3,6 +3,7 @@ package scrap
 import (
 	"MalSql/scrap/anime"
 	"MalSql/scrap/anime/mal"
+	"MalSql/scrap/plog"
 	_ "embed"
 	"fmt"
 	"log"
@@ -59,6 +60,8 @@ type scraper struct {
 }
 
 func New(opts Options) scraper {
+	slog.SetDefault(plog.NewPlog())
+
 	if opts.Env {
 		err := godotenv.Load()
 		if err != nil {
