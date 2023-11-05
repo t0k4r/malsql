@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -68,6 +69,9 @@ func New(opts Options) scraper {
 			slog.Error(err.Error())
 		}
 		opts.Conn = os.Getenv("MALSQL_DB")
+		if strings.HasPrefix(opts.Conn, "postgres://") {
+			opts.Driver = "postgres"
+		}
 	}
 	if opts.Driver != "sqlite3" && opts.Driver != "postgres" {
 		log.Fatal("unknown driver ", opts.Driver)
