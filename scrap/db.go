@@ -4,6 +4,7 @@ import (
 	"MalSql/scrap/anime"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -61,7 +62,28 @@ func newDSaver(opts Options) (*dSaver, error) {
 func (d *dSaver) listen(schan chan []*anime.Anime) {
 	d.wg.Add(1)
 	go func() {
+		for animes := range schan {
+			var relations []string
+			for _, anime := range animes {
+				asql, rsql := anime.Sql()
+				for _, anime := range asql {
+					_, err := d.db.Exec(anime.Sql(d.onConflict))
+					if err != nil {
+						slog.Error(err.Error())
+					}
+				}
+				for _, relation := range rsql {
+					relations = append(relations, relation.Sql(d.onConflict))
+				}
+			}
+			for _, sql := range relations {
+				_, err := d.db.Exec(sql)
+				if err != nil {
+					slog.Error(err.Error())
+				}
+			}
 
+		}
 		d.wg.Done()
 	}()
 }

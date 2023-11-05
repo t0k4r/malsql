@@ -102,7 +102,7 @@ func New(opts Options) scraper {
 func (s scraper) Run() {
 	snd := make(chan []*anime.Anime)
 	s.listen(snd)
-
+	t := time.Now()
 	for i := s.Start; i < s.End; i++ {
 		if slices.Contains(s.done, i) {
 			continue
@@ -119,6 +119,7 @@ func (s scraper) Run() {
 
 	close(snd)
 	s.wait()
+	slog.Info("Done", "animes", len(s.done), "took", time.Since(t))
 }
 
 func loadAnime[T int | string](id T) *anime.Anime {

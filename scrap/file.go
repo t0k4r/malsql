@@ -46,9 +46,9 @@ func (f *fSaver) listen(schan chan []*anime.Anime) {
 					if err != nil {
 						slog.Error(err.Error())
 					}
-					for _, relation := range rsql {
-						relations = append(relations, relation.Sql(f.onConflict)+";\n")
-					}
+				}
+				for _, relation := range rsql {
+					relations = append(relations, relation.Sql(f.onConflict)+";\n")
 				}
 			}
 			for _, sql := range relations {
