@@ -27,7 +27,7 @@ func (p *Plog) Handle(ctx context.Context, rec slog.Record) error {
 			return true
 		})
 	case slog.LevelWarn:
-		out.WriteString(fmt.Sprintf("\033[0;33m%v:\033[0m\n", rec.Message))
+		out.WriteString(fmt.Sprintf("\033[0;33m%v\033[0m\n", rec.Message))
 		rec.Attrs(func(a slog.Attr) bool {
 			out.WriteString(fmt.Sprintf("\t%v: %v\n", a.Key, a.Value))
 			return true

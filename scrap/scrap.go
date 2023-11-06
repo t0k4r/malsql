@@ -110,6 +110,7 @@ func (s scraper) Run() {
 	snd := make(chan []*anime.Anime)
 	s.listen(snd)
 	t := time.Now()
+	var ser series
 	for i := s.Start; i < s.End; i++ {
 		if slices.Contains(s.done, i) {
 			continue
@@ -118,7 +119,8 @@ func (s scraper) Run() {
 		if anime == nil {
 			continue
 		}
-		var ser series
+		ser.reset()
+		ser.Lock()
 		ser.load(anime)
 		s.done = append(s.done, ser.done...)
 		snd <- ser.animes
@@ -136,37 +138,57 @@ func loadAnime[T int | string](id T) *anime.Anime {
 	case mal.ErrMal404:
 		return nil
 	case mal.ErrMal429:
-		slog.Warn("MalBlocked")
-		mal.FixBlock()
+		if mal.Fixlock.TryLock() {
+			slog.Warn("Mal blocked!")
+			mal.FixBlock()
+		}
+		mal.Fixlock.Lock()
+		mal.Fixlock.Unlock()
 		return loadAnime(id)
 	case nil:
 		slog.Info("Scrapped", "anime", anime.Title, "episodes", len(anime.Episodes), "took", time.Since(n))
-		return &anime
+		return anime
 	default:
 		time.Sleep(time.Second * 5)
-		slog.Error(err.Error())
+		slog.Error("Error", err)
 		return loadAnime(id)
 	}
 }
 
 type series struct {
+	sync.Mutex
 	done   []int
 	animes []*anime.Anime
+}
+
+func (s *series) reset() {
+	s.Lock()
+	s.done = []int{}
+	s.animes = []*anime.Anime{}
+	s.Unlock()
+
 }
 
 func (s *series) load(root *anime.Anime) {
 	var wg sync.WaitGroup
 	s.animes = append(s.animes, root)
 	s.done = append(s.done, root.MagicNumber())
+	s.Unlock()
 	for _, r := range root.Related {
+		s.Lock()
 		if slices.Contains(s.done, mal.MagicNumber(r.Url)) {
+			s.Unlock()
 			continue
 		}
+		s.Unlock()
 		wg.Add(1)
 		go func(url string) {
 			anime := loadAnime(url)
+			s.Lock()
 			if anime != nil && !slices.Contains(s.done, anime.MagicNumber()) {
 				s.load(anime)
+			} else {
+				s.Unlock()
 			}
 			wg.Done()
 		}(r.Url)

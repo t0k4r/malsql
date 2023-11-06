@@ -24,7 +24,7 @@ type Title struct {
 }
 
 type Anime struct {
-	mal.Anime
+	*mal.Anime
 	Episodes   []Episode
 	typeOf     string
 	season     string
@@ -33,11 +33,11 @@ type Anime struct {
 	altTitles  []Title
 }
 
-func LoadAnime[T string | int](malUrl T) (Anime, error) {
-	ma, err := mal.LoadAnime(malUrl)
-	anime := Anime{Anime: ma}
+func LoadAnime[T string | int](malUrl T) (*Anime, error) {
+	mala, err := mal.LoadAnime(malUrl)
+	anime := Anime{Anime: mala}
 	if err != nil {
-		return anime, err
+		return nil, err
 	}
 	g := new(errgroup.Group)
 	var EpTitles []mal.Episode
@@ -58,7 +58,7 @@ func LoadAnime[T string | int](malUrl T) (Anime, error) {
 	anime.filterInfos()
 	err = g.Wait()
 	anime.joinEpisodes(EpTitles, EpStreams)
-	return anime, err
+	return &anime, err
 }
 
 func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {

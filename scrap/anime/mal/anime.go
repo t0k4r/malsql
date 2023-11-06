@@ -31,7 +31,7 @@ type Anime struct {
 var ErrMal404 = errors.New("no anime with given url exists mal404")
 var ErrMal429 = errors.New("mal is blocked mal429")
 
-func LoadAnime[T string | int](url T) (Anime, error) {
+func LoadAnime[T string | int](url T) (*Anime, error) {
 	var anime Anime
 	switch any(url).(type) {
 	case string:
@@ -41,17 +41,17 @@ func LoadAnime[T string | int](url T) (Anime, error) {
 	}
 	res, err := http.Get(anime.MalUrl)
 	if err != nil {
-		return anime, err
+		return nil, err
 	}
 	switch res.StatusCode {
 	case 404:
-		return anime, ErrMal404
+		return nil, ErrMal404
 	case 429:
-		return anime, ErrMal429
+		return nil, ErrMal429
 	case 200:
 		doc, err := goquery.NewDocumentFromReader(res.Body)
 		if err != nil {
-			return anime, err
+			return nil, err
 		}
 		if strings.HasSuffix(anime.MalUrl, "co_ty_tutaj_robisz") {
 			doc.Find("div.breadcrumb").ChildrenFiltered("div.di-ib").Each(func(i int, s *goquery.Selection) {
@@ -111,9 +111,9 @@ func LoadAnime[T string | int](url T) (Anime, error) {
 			}
 		}
 		anime.Related = filteredRelated
-		return anime, nil
+		return &anime, nil
 	default:
-		return anime, fmt.Errorf("unknown http status code %v", res.Status)
+		return nil, fmt.Errorf("unknown http status code %v", res.Status)
 	}
 }
 
