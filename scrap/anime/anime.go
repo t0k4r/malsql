@@ -144,8 +144,8 @@ func (a *Anime) filterInfos() {
 }
 
 // anime, relations
-func (a *Anime) Sql() ([]qb.QInsert, []qb.QInsert) {
-	var anime []qb.QInsert
+func (a *Anime) Sql() ([]*qb.QInsert, []*qb.QInsert) {
+	var anime []*qb.QInsert
 	anime = append(anime, qb.
 		Insert("anime_types").
 		Col("type_of", a.typeOf))
@@ -238,7 +238,7 @@ func (a *Anime) Sql() ([]qb.QInsert, []qb.QInsert) {
 					Wheref("stream_source = '%v'", episode.src)))
 		}
 	}
-	var relations []qb.QInsert
+	var relations []*qb.QInsert
 	for _, r := range a.Related {
 		relations = append(relations, qb.
 			Insert("relation_types").

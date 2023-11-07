@@ -16,6 +16,8 @@ github.com/t0k4r/qb v0.0.0-20231020224937-d816cb10ec57 h1:9u/Q+gPmOK0Sl0WsPz1bpX
 github.com/t0k4r/qb v0.0.0-20231020224937-d816cb10ec57/go.mod h1:ins/BVwghkK/eHD4t+keQNqTuso9gOnB2AkM/CxEXac=
 github.com/t0k4r/qb v0.0.0-20231105204334-049abf7af965 h1:CDAQlCbZy3lprqkpZjL3UJYufFUw6X12MvPT87yiYcY=
 github.com/t0k4r/qb v0.0.0-20231105204334-049abf7af965/go.mod h1:ins/BVwghkK/eHD4t+keQNqTuso9gOnB2AkM/CxEXac=
+github.com/t0k4r/qb v0.0.0-20231106112456-74181f34b0c7 h1:9sqHIj9RrI0zmbhz0rB7BLo0w6y27afNaPTDU6YBMoI=
+github.com/t0k4r/qb v0.0.0-20231106112456-74181f34b0c7/go.mod h1:ins/BVwghkK/eHD4t+keQNqTuso9gOnB2AkM/CxEXac=
 github.com/ysmood/fetchup v0.2.3 h1:ulX+SonA0Vma5zUFXtv52Kzip/xe7aj4vqT5AJwQ+ZQ=
 github.com/ysmood/fetchup v0.2.3/go.mod h1:xhibcRKziSvol0H1/pj33dnKrYyI2ebIvz5cOOkYGns=
 github.com/ysmood/goob v0.4.0 h1:HsxXhyLBeGzWXnqVKtmT9qM7EuVs/XOgkX7T6r1o1AQ=
