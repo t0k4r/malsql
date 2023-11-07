@@ -3,12 +3,19 @@ package main
 import (
 	"MalSql/scrap"
 	"flag"
+	"log"
 	"os"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println("panic occurred:", err)
+		}
+	}()
+
 	var opts scrap.Options
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flag.IntVar(&opts.Start, "start", 1, "start index")

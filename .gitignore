@@ -4,3 +4,4 @@ MalSql_dump.sql
 MalSql.sqlite
 MalSql.sqlite-journal
 logs.txt
+*.sql

@@ -24,7 +24,7 @@ type Title struct {
 }
 
 type Anime struct {
-	mal.Anime
+	*mal.Anime
 	Episodes   []Episode
 	typeOf     string
 	season     string
@@ -34,11 +34,11 @@ type Anime struct {
 }
 
 func LoadAnime[T string | int](malUrl T) (*Anime, error) {
-	ma, err := mal.LoadAnime(malUrl)
+	mala, err := mal.LoadAnime(malUrl)
+	anime := Anime{Anime: mala}
 	if err != nil {
 		return nil, err
 	}
-	anime := &Anime{Anime: ma}
 	g := new(errgroup.Group)
 	var EpTitles []mal.Episode
 	g.Go(func() error {
@@ -58,7 +58,7 @@ func LoadAnime[T string | int](malUrl T) (*Anime, error) {
 	anime.filterInfos()
 	err = g.Wait()
 	anime.joinEpisodes(EpTitles, EpStreams)
-	return anime, err
+	return &anime, err
 }
 
 func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {
@@ -144,8 +144,8 @@ func (a *Anime) filterInfos() {
 }
 
 // anime, relations
-func (a *Anime) Sql() ([]qb.QInsert, []qb.QInsert) {
-	var anime []qb.QInsert
+func (a *Anime) Sql() ([]*qb.QInsert, []*qb.QInsert) {
+	var anime []*qb.QInsert
 	anime = append(anime, qb.
 		Insert("anime_types").
 		Col("type_of", a.typeOf))
@@ -238,7 +238,7 @@ func (a *Anime) Sql() ([]qb.QInsert, []qb.QInsert) {
 					Wheref("stream_source = '%v'", episode.src)))
 		}
 	}
-	var relations []qb.QInsert
+	var relations []*qb.QInsert
 	for _, r := range a.Related {
 		relations = append(relations, qb.
 			Insert("relation_types").
