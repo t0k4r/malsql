@@ -2,7 +2,6 @@ package scrap
 
 import (
 	"MalSql/scrap/anime"
-	"MalSql/scrap/anime/mal"
 	"MalSql/scrap/plog"
 	_ "embed"
 	"fmt"
@@ -41,11 +40,11 @@ type Options struct {
 	Env    bool
 }
 
-func (o Options) onConflict() qb.Conflict {
+func (o Options) onConflict() qb.OnConflict {
 	if o.Update {
-		return qb.Replace
+		return qb.DoUpdate
 	} else {
-		return qb.Ignore
+		return qb.DoNothing
 	}
 }
 
@@ -135,17 +134,10 @@ func loadAnime[T int | string](id T) *anime.Anime {
 	n := time.Now()
 	anime, err := anime.LoadAnime(id)
 	switch err {
-	case mal.ErrMal404:
-		return nil
-	case mal.ErrMal429:
-		if mal.Fixlock.TryLock() {
-			slog.Warn("Mal blocked!")
-			mal.FixBlock()
-		}
-		mal.Fixlock.Lock()
-		mal.Fixlock.Unlock()
-		return loadAnime(id)
 	case nil:
+		if anime == nil {
+			return nil
+		}
 		slog.Info("Scrapped", "anime", anime.Title, "episodes", len(anime.Episodes), "took", time.Since(n))
 		return anime
 	default:
@@ -174,9 +166,9 @@ func (s *series) load(root *anime.Anime) {
 	s.animes = append(s.animes, root)
 	s.done = append(s.done, root.MagicNumber())
 	s.Unlock()
-	for _, r := range root.Related {
+	for _, url := range root.Related {
 		s.Lock()
-		if slices.Contains(s.done, mal.MagicNumber(r.Url)) {
+		if slices.Contains(s.done, anime.MagicNumber(url[0])) {
 			s.Unlock()
 			continue
 		}
@@ -191,7 +183,7 @@ func (s *series) load(root *anime.Anime) {
 				s.Unlock()
 			}
 			wg.Done()
-		}(r.Url)
+		}(url[0])
 	}
 	wg.Wait()
 }

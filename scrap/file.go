@@ -11,7 +11,7 @@ import (
 
 type fSaver struct {
 	wg         sync.WaitGroup
-	onConflict qb.Conflict
+	onConflict qb.OnConflict
 	file       *os.File
 }
 
@@ -42,13 +42,17 @@ func (f *fSaver) listen(schan chan []*anime.Anime) {
 			for _, anime := range animes {
 				asql, rsql := anime.Sql()
 				for _, anime := range asql {
-					_, err := f.file.WriteString(anime.Sql(f.onConflict) + ";\n")
+					_, err := f.file.WriteString(anime.
+						OnConflict(f.onConflict).
+						Sql() + ";\n")
 					if err != nil {
 						slog.Error(err.Error())
 					}
 				}
 				for _, relation := range rsql {
-					relations = append(relations, relation.Sql(f.onConflict)+";\n")
+					relations = append(relations, relation.
+						OnConflict(f.onConflict).
+						Sql()+";\n")
 				}
 			}
 			for _, sql := range relations {

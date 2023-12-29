@@ -1,269 +1,325 @@
 package anime
 
 import (
-	"MalSql/scrap/anime/gogo"
-	"MalSql/scrap/anime/mal"
-
+	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/t0k4r/qb"
 	"golang.org/x/sync/errgroup"
 )
 
-type Episode struct {
-	mal.Episode
-	index int
-	url   string
-	src   string
-}
-
-type Title struct {
-	lang  string
-	title string
-}
-
 type Anime struct {
-	*mal.Anime
-	Episodes   []Episode
-	typeOf     string
-	season     string
-	seasonDate string
-	aired      []string
-	altTitles  []Title
+	errgroup.Group
+	Title       string
+	Description string
+	MalUrl      string
+	ImgUrl      string
+	Information map[string][]string
+	Related     map[string][]string
+	Episodes    []Episode
 }
 
-func LoadAnime[T string | int](malUrl T) (*Anime, error) {
-	mala, err := mal.LoadAnime(malUrl)
-	anime := Anime{Anime: mala}
+func LoadAnime[T int | string](url T) (*Anime, error) {
+	anime := Anime{
+		Group:       errgroup.Group{},
+		Title:       "",
+		Description: "",
+		MalUrl:      "",
+		ImgUrl:      "",
+		Information: map[string][]string{},
+		Related:     map[string][]string{},
+		Episodes:    []Episode{},
+	}
+	switch any(url).(type) {
+	case string:
+		anime.MalUrl = fmt.Sprintf("%v", url)
+	case int:
+		anime.MalUrl = fmt.Sprintf("https://myanimelist.net/anime/%v/co_ty_tutaj_robisz", url)
+	}
+	res, err := http.Get(anime.MalUrl)
 	if err != nil {
 		return nil, err
 	}
-	g := new(errgroup.Group)
-	var EpTitles []mal.Episode
-	g.Go(func() error {
-		ep, err := mal.GetEpisodes(anime.MalUrl)
-		EpTitles = ep
-		return err
-	})
-	var EpStreams []string
-	g.Go(func() error {
-		es, err := gogo.GetEpisodes(anime.Title)
-		EpStreams = es
-		if err == gogo.ErrGoGo404 {
-			return nil
+	switch res.StatusCode {
+	case 404:
+		return nil, nil
+	case 429:
+		FixBlock()
+		return LoadAnime(anime.Title)
+	case 200:
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			return nil, err
 		}
+		anime.Title = doc.Find(`.title-name`).Text()
+		anime.Go(anime.LoadEpisodes)
+		anime.Description = doc.Find(`p[itemprop="description"]`).Text()
+		doc.Find("div.breadcrumb").ChildrenFiltered("div.di-ib").Each(func(i int, s *goquery.Selection) {
+			if i == 2 {
+				anime.MalUrl = s.ChildrenFiltered("a").AttrOr("href", "")
+			}
+		})
+		anime.ImgUrl = doc.Find(`img[itemprop="image"]`).AttrOr("data-src", "")
+		doc.Find(`div.leftside>div.spaceit_pad`).Each(func(i int, s *goquery.Selection) {
+			key := strings.Replace(strings.ToLower(s.ChildrenFiltered(`span.dark_text`).Text()), ":", "", 1)
+			var values []string
+			s.ChildrenFiltered(`a`).Each(func(i int, s *goquery.Selection) {
+				values = append(values, s.Text())
+			})
+			if len(values) == 0 {
+				values = append(values, strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n "))
+			}
+			for _, v := range values {
+				vals, ok := anime.Information[key]
+				if ok {
+					anime.Information[key] = append(vals, v)
+				} else {
+					anime.Information[key] = []string{v}
+				}
+			}
+		})
+		doc.Find(`.js-alternative-titles>.spaceit_pad`).Each(func(i int, s *goquery.Selection) {
+			key := strings.Replace(strings.ToLower(s.ChildrenFiltered(`span.dark_text`).Text()), ":", "", 1)
+			v := strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n ")
+			vals, ok := anime.Information[key]
+			if ok {
+				anime.Information[key] = append(vals, v)
+			} else {
+				anime.Information[key] = []string{v}
+			}
+		})
+		doc.Find(".anime_detail_related_anime>tbody>tr").Each(func(i int, s *goquery.Selection) {
+			key := ""
+			s.ChildrenFiltered("td").Each(func(i int, s *goquery.Selection) {
+				if i == 0 {
+					key = strings.ToLower(s.Text())
+					key = strings.Split(key, ":")[0]
+				} else {
+					s.ChildrenFiltered("a").Each(func(i int, s *goquery.Selection) {
+						v := fmt.Sprintf("https://myanimelist.net%v", s.AttrOr("href", ""))
+						vals, ok := anime.Related[key]
+						if ok {
+							anime.Related[key] = append(vals, v)
+						} else {
+							anime.Related[key] = []string{v}
+						}
+					})
+				}
+			})
+		})
+		delete(anime.Related, "adaptation")
+		return &anime, anime.Wait()
+	default:
+		panic(fmt.Sprintf("unknown status code %v", res.StatusCode))
+	}
+}
+func (a *Anime) LoadEpisodes() error {
+	var src string
+	var streams []string
+	var episodes []Episode
+	wg := new(errgroup.Group)
+	wg.Go(func() error {
+		var err error
+		src, streams, err = LoadEpisodeStreams(a.Title)
 		return err
 	})
-	anime.filterInfos()
-	err = g.Wait()
-	anime.joinEpisodes(EpTitles, EpStreams)
-	return &anime, err
-}
-
-func (a *Anime) joinEpisodes(ep []mal.Episode, es []string) {
-	if len(ep) >= len(es) {
-		a.Episodes = make([]Episode, len(ep))
-		for i, e := range ep {
-			episode := Episode{Episode: e, src: "www3.gogoanimes.fi", index: i}
-			episode.url = getOrEmpty(es, i)
-			a.Episodes[i] = episode
+	wg.Go(func() error {
+		var err error
+		episodes, err = LoadEpisodes(a.MalUrl)
+		return err
+	})
+	err := wg.Wait()
+	if err != nil {
+		return err
+	}
+	a.Episodes = episodes
+	if len(a.Episodes) >= len(episodes) {
+		for i := range a.Episodes {
+			a.Episodes[i].Index = i
+			a.Episodes[i].StreamSrc = src
+			if i < len(streams) {
+				a.Episodes[i].StreamUrl = streams[i]
+			}
 		}
 	} else {
-		a.Episodes = make([]Episode, len(es))
-		for i, e := range es {
-			episode := Episode{url: e, src: "www3.gogoanimes.fi", index: i}
-			if i < len(ep) {
-				episode.Episode = ep[i]
+		for i, stream := range streams {
+			if i < len(a.Episodes) {
+				a.Episodes[i].Index = i
+				a.Episodes[i].StreamSrc = src
+				a.Episodes[i].StreamUrl = stream
+			} else {
+				a.Episodes = append(a.Episodes, Episode{
+					Index:     i,
+					Title:     "",
+					AltTitle:  "",
+					StreamSrc: src,
+					StreamUrl: stream,
+				})
 			}
-			a.Episodes[i] = episode
 		}
 	}
+	return nil
+
 }
 
-func (a *Anime) filterInfos() {
-	var filtered []mal.Info
-	for _, info := range a.Information {
-		switch info.Key {
-		case "type":
-			a.typeOf = info.Value
-		case "premiered":
-			a.season = info.Value
-			sds := strings.Split(strings.Trim(info.Value, " \n"), " ")
-			if len(sds) == 2 {
-				t, err := time.Parse("2006", sds[1])
-				if err == nil {
-					switch sds[0] {
-					case "Spring":
-						t = t.AddDate(0, 2, 20)
-					case "Summer":
-						t = t.AddDate(0, 5, 21)
-					case "Fall":
-						t = t.AddDate(0, 8, 23)
-					case "Winter":
-						t = t.AddDate(0, 11, 22)
-					}
-					a.seasonDate = t.Format("2006-01-02")
-				}
-			}
-		case "aired":
-			for _, i := range strings.Split(info.Value, "to") {
-				i = strings.Trim(i, " \n")
-				switch len(i) {
-				case 4:
-					t, err := time.Parse("2006", i)
-					if err == nil {
-						a.aired = append(a.aired, t.Format("2006-01-02"))
-					}
-				case 8:
-					t, err := time.Parse("Jan 2006", i)
-					if err == nil {
-						a.aired = append(a.aired, t.Format("2006-01-02"))
-					}
-				case 11, 12:
-					t, err := time.Parse("Jan 2, 2006", i)
-					if err == nil {
-						a.aired = append(a.aired, t.Format("2006-01-02"))
-					}
-				}
-			}
-		case "synonyms", "japanese", "english", "german", "french", "spanish":
-			title := Title{lang: info.Key, title: info.Value}
-			a.altTitles = append(a.altTitles, title)
-		case "theme", "genre", "demographic", "producer", "licensor", "studio":
-			info.Key += "s"
-			filtered = append(filtered, info)
-		default:
-			txt := info.Value
-			txt = strings.Join(strings.Fields(txt), " ")
-			info.Value = txt
-			filtered = append(filtered, info)
-		}
-	}
-	a.Information = filtered
-}
-
-// anime, relations
 func (a *Anime) Sql() ([]*qb.QInsert, []*qb.QInsert) {
-	var anime []*qb.QInsert
-	anime = append(anime, qb.
-		Insert("anime_types").
-		Col("type_of", a.typeOf))
-	if a.season != "" {
-		anime = append(anime, qb.
-			Insert("seasons").
-			Col("season", a.season).
-			Col("value", a.seasonDate))
+	var animeSql []*qb.QInsert
+	var relationsSql []*qb.QInsert
+	for k, v := range a.Information {
+		for i := range v {
+			v[i] = strings.Join(strings.Fields(v[i]), " ")
+		}
+		a.Information[k] = v
 	}
-
-	anime = append(anime, qb.
+	TypeOf, ok := a.Information["type"]
+	if ok {
+		animeSql = append(animeSql, qb.
+			Insert("anime_types").
+			Set("type_of", TypeOf[0]))
+	} else {
+		TypeOf = append(TypeOf, "")
+	}
+	Season, ok := a.Information["premiered"]
+	if ok {
+		sds := strings.Split(Season[0], " ")
+		if len(sds) == 2 {
+			t, err := time.Parse("2006", sds[1])
+			if err == nil {
+				switch sds[0] {
+				case "Spring":
+					t = t.AddDate(0, 2, 20)
+				case "Summer":
+					t = t.AddDate(0, 5, 21)
+				case "Fall":
+					t = t.AddDate(0, 8, 23)
+				case "Winter":
+					t = t.AddDate(0, 11, 22)
+				}
+				animeSql = append(animeSql, qb.Insert("seasons").
+					Set("season", Season[0]).
+					Set("value", t.Format("2006-01-02")))
+			}
+		}
+	} else {
+		Season = append(Season, "")
+	}
+	Aired, ok := a.Information["aired"]
+	if ok {
+		NewAired := make([]string, 2)
+		for _, i := range strings.Split(Aired[0], "to") {
+			i = strings.Trim(i, " \n")
+			switch len(i) {
+			case 4:
+				t, err := time.Parse("2006", i)
+				if err == nil {
+					NewAired = append(NewAired, t.Format("2006-01-02"))
+				}
+			case 8:
+				t, err := time.Parse("Jan 2006", i)
+				if err == nil {
+					NewAired = append(NewAired, t.Format("2006-01-02"))
+				}
+			case 11, 12:
+				t, err := time.Parse("Jan 2, 2006", i)
+				if err == nil {
+					NewAired = append(NewAired, t.Format("2006-01-02"))
+				}
+			}
+		}
+		for len(NewAired) < 2 {
+			NewAired = append(NewAired, "")
+		}
+		Aired = NewAired
+	} else {
+		Aired = append(Aired, "")
+		Aired = append(Aired, "")
+	}
+	animeSql = append(animeSql, qb.
 		Insert("animes").
-		Col("title", a.Title).
-		Col("description", a.Description).
-		Col("mal_url", a.MalUrl).
-		Col("cover", a.ImgUrl).
-		Col("aired_from", getOrEmpty(a.aired, 0)).
-		Col("aired_to", getOrEmpty(a.aired, 1)).
-		Col("type_id", qb.
-			Select("anime_types").
-			Cols("id").
-			Wheref("type_of = '%v'", a.typeOf)).
-		Col("season_id", qb.
-			Select("seasons").
-			Cols("id").
-			Wheref("season = '%v'", a.season)))
-	for _, title := range a.altTitles {
-		anime = append(anime, qb.
-			Insert("alt_title_types").
-			Col("type_of", title.lang))
-		anime = append(anime, qb.
-			Insert("alt_titles").
-			Col("alt_title_type_id", qb.
-				Select("alt_title_types").
-				Cols("id").
-				Wheref("type_of = '%v'", title.lang)).
-			Col("anime_id", qb.
-				Select("animes").
-				Cols("id").
-				Wheref("mal_url = '%v'", a.MalUrl)).
-			Col("alt_title", title.title))
-	}
-	for _, info := range a.Information {
-		anime = append(anime, qb.
-			Insert("info_types").
-			Col("type_of", info.Key))
-		anime = append(anime, qb.
-			Insert("infos").
-			Col("info", info.Value).
-			Col("type_id", qb.
-				Select("info_types").
-				Cols("id").
-				Wheref("type_of = '%v'", info.Key)))
-		anime = append(anime, qb.
-			Insert("anime_infos").
-			Col("anime_id", qb.
-				Select("animes").
-				Cols("id").
-				Wheref("mal_url = '%v'", a.MalUrl)).
-			Col("info_id", qb.
-				Select("infos").
-				Cols("id").
-				Wheref("info = '%v'", info.Value)))
+		Set("title", a.Title).
+		Set("description", a.Description).
+		Set("mal_url", a.MalUrl).
+		Set("cover", a.ImgUrl).
+		Set("aired_from", Aired[0]).
+		Set("aired_to", Aired[1]).
+		Setf("type_id",
+			"(select id from anime_types where type_of = '%v')", TypeOf[0]).
+		Setf("season_id",
+			"(select id from seasons where season = '%v')", Season[0]))
+
+	for key, values := range a.Information {
+		switch key {
+		case "type", "premiered", "aired":
+			continue
+		case "synonyms", "japanese", "english", "german", "french", "spanish":
+			for _, value := range values {
+				animeSql = append(animeSql, qb.
+					Insert("alt_title_types").
+					Set("type_of", key))
+				animeSql = append(animeSql, qb.
+					Insert("alt_titles").
+					Setf("alt_title_type_id",
+						"(select id from alt_title_types where type_of = '%v')", key).
+					Setf("anime_id",
+						"(select id from animes where mal_url = '%v')", a.MalUrl).
+					Set("alt_title", value))
+			}
+			continue
+		case "theme", "genre", "demographic", "producer", "licensor", "studio":
+			key += "s"
+		}
+		for _, value := range values {
+			animeSql = append(animeSql, qb.
+				Insert("info_types").
+				Set("type_of", key))
+			animeSql = append(animeSql, qb.
+				Insert("infos").
+				Set("info", value).
+				Setf("type_id",
+					"(select id from info_types where type_of = '%v')", key))
+			animeSql = append(animeSql, qb.
+				Insert("anime_infos").
+				Setf("anime_id",
+					"(select id from animes where mal_url = '%v')", a.MalUrl).
+				Setf("info_id",
+					"(select id from infos where info = '%v')", strings.ReplaceAll(value, "'", "''")))
+		}
 	}
 	for _, episode := range a.Episodes {
-		anime = append(anime, qb.
+		animeSql = append(animeSql, qb.
 			Insert("stream_sources").
-			Col("stream_source", episode.src))
-		anime = append(anime, qb.
+			Set("stream_source", episode.StreamSrc))
+		animeSql = append(animeSql, qb.
 			Insert("episodes").
-			Col("title", episode.Title).
-			Col("alt_title", episode.AltTitle).
-			Col("index_of", episode.index).
-			Col("anime_id", qb.
-				Select("animes").
-				Cols("id").
-				Wheref("mal_url = '%v'", a.MalUrl)))
-		if episode.url != "" {
-			anime = append(anime, qb.
+			Set("title", episode.Title).
+			Set("alt_title", episode.AltTitle).
+			Set("index_of", episode.Index).
+			Setf("anime_id",
+				"(select id from animes where mal_url = '%v')", a.MalUrl))
+		if episode.StreamUrl != "" {
+			animeSql = append(animeSql, qb.
 				Insert("episode_streams").
-				Col("stream", episode.url).
-				Col("episode_id", qb.
-					Select("episodes e").
-					Cols("id").
-					Wheref("e.anime_id = (select id from animes where mal_url = '%v' and e.index_of = %v)",
-						a.MalUrl, episode.index)).
-				Col("source_id", qb.
-					Select("stream_sources").
-					Cols("id").
-					Wheref("stream_source = '%v'", episode.src)))
+				Set("stream", episode.StreamUrl).
+				Setf("episode_id",
+					"(select e.id from episodes e where e.anime_id = (select id from animes where mal_url = '%v' and e.index_of = %v))",
+					a.MalUrl, episode.Index).
+				Setf("source_id",
+					"(select id from stream_sources where stream_source = '%v')", episode.StreamSrc))
 		}
 	}
-	var relations []*qb.QInsert
-	for _, r := range a.Related {
-		relations = append(relations, qb.
-			Insert("relation_types").
-			Col("type_of", r.TypeOf))
-		relations = append(relations, qb.
-			Insert("relations").
-			Col("root_anime_id", qb.
-				Select("animes").
-				Cols("id").
-				Wheref("mal_url = '%v'", a.MalUrl)).
-			Col("related_anime_id", qb.
-				Select("animes").
-				Cols("id").
-				Wheref("mal_url = '%v'", r.Url)).
-			Col("type_id", qb.
-				Select("relation_types").
-				Cols("id").
-				Wheref("type_of = '%v'", r.TypeOf)))
-	}
-	return anime, relations
+
+	return animeSql, relationsSql
 }
 
-func getOrEmpty(arr []string, i int) string {
-	if len(arr) > i {
-		return arr[i]
-	}
-	return ""
+func (a *Anime) MagicNumber() int {
+	return MagicNumber(a.MalUrl)
+}
+
+func MagicNumber(url string) int {
+	i, _ := strconv.Atoi(strings.Split(url, "/")[4])
+	return i
 }

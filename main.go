@@ -3,18 +3,28 @@ package main
 import (
 	"MalSql/scrap"
 	"flag"
-	"log"
 	"os"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println("panic occurred:", err)
-		}
-	}()
+	// t := time.Now()
+	// a, err := anime.LoadAnime(1)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// as, _ := a.Sql()
+	// for _, ins := range as {
+	// 	log.Println(ins.Sql())
+	// }
+	// fmt.Printf("%v \n", time.Since(t))
+	// return
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		log.Println("panic occurred:", err)
+	// 	}
+	// }()
 
 	var opts scrap.Options
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)

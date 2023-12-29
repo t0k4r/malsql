@@ -15,7 +15,7 @@ import (
 type dSaver struct {
 	db         *sql.DB
 	wg         sync.WaitGroup
-	onConflict qb.Conflict
+	onConflict qb.OnConflict
 }
 
 func newDSaver(opts Options) (*dSaver, error) {
@@ -67,13 +67,17 @@ func (d *dSaver) listen(schan chan []*anime.Anime) {
 			for _, anime := range animes {
 				asql, rsql := anime.Sql()
 				for _, anime := range asql {
-					_, err := d.db.Exec(anime.Sql(d.onConflict))
+					err := anime.
+						OnConflict(d.onConflict).
+						Exec(d.db)
 					if err != nil {
 						slog.Error(err.Error())
 					}
 				}
 				for _, relation := range rsql {
-					relations = append(relations, relation.Sql(d.onConflict))
+					relations = append(relations, relation.
+						OnConflict(d.onConflict).
+						Sql())
 				}
 			}
 			for _, sql := range relations {
