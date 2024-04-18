@@ -27,7 +27,6 @@ type Episode struct {
 	Url      string
 	Title    string
 	TitleAlt string
-	Descr    string
 }
 
 type Anime struct {
@@ -96,7 +95,7 @@ func (a *Anime) TitleAlt() map[string]string {
 
 func (a *Anime) fetchEpisodes(url Url, offset int) func() error {
 	return func() error {
-		res, err := http.Get(fmt.Sprintf("%v/offset=%v", url, offset))
+		res, err := http.Get(fmt.Sprintf("%v/episode?offset=%v", url, offset))
 		if err != nil {
 			return err
 		}
@@ -115,18 +114,28 @@ func (a *Anime) fetchEpisodes(url Url, offset int) func() error {
 		if err != nil {
 			return err
 		}
-		_ = doc
 		var episodes []Episode
+		doc.Find(".episode-title").Each(func(i int, s *goquery.Selection) {
+			title := s.Find("a")
+			url, _ := title.Attr("href")
+			titlealt := s.Find("span")
+			episodes = append(episodes, Episode{
+				Url:      url,
+				Title:    title.Text(),
+				TitleAlt: titlealt.Text(),
+			})
+		})
 		if len(episodes) == 0 {
 			return nil
 		}
+		a.Episodes = append(a.Episodes, episodes...)
 		return a.fetchEpisodes(url, offset+100)()
 	}
 }
 
 func FetchAnime(url Url) (*Anime, error) {
 	var anime Anime
-	var eg errgroup.Group
+	eg := new(errgroup.Group)
 	eg.Go(anime.fetchEpisodes(url, 0))
 	res, err := http.Get(string(url))
 	if err != nil {
