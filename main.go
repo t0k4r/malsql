@@ -7,10 +7,9 @@ import (
 )
 
 func main() {
-
 	anime, err := mal.FetchAnime(mal.UrlFromId(32867))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(anime)
+	fmt.Println(anime.Infos())
 }

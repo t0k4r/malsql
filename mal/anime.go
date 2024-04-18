@@ -2,8 +2,8 @@ package mal
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -40,47 +40,108 @@ type Anime struct {
 	Episodes    []Episode
 }
 
-func (a *Anime) TypeOf() string {
-	return ""
+func (a *Anime) Type() (string, bool) {
+	t, ok := a.infos["type"]
+	return strings.Join(t, ""), ok
+}
+func (a *Anime) Season() (string, time.Time, bool) {
+	s, ok := a.infos["premiered"]
+	if !ok {
+		return "", time.Now(), false
+	}
+	str := strings.Join(s, "")
+	var t time.Time
+	var err error
+	sds := strings.Split(strings.Trim(str, " \n"), " ")
+	if len(sds) == 2 {
+		t, err = time.Parse("2006", sds[1])
+		if err == nil {
+			switch sds[0] {
+			case "Spring":
+				t = t.AddDate(0, 2, 20)
+			case "Summer":
+				t = t.AddDate(0, 5, 21)
+			case "Fall":
+				t = t.AddDate(0, 8, 23)
+			case "Winter":
+				t = t.AddDate(0, 11, 22)
+			}
+		}
+	}
+	return str, t, ok
+
 }
 func (a *Anime) Infos() map[string][]string {
-	return nil
+	infos := make(map[string][]string)
+	for k, v := range a.infos {
+		switch k {
+		case "synonyms", "japanese", "english", "german", "french", "spanish", "type", "premiered":
+			continue
+		case "theme", "genre", "demographic", "producer", "licensor", "studio":
+			infos[k+"s"] = v
+		default:
+			infos[k] = v
+		}
+	}
+	return infos
 }
 
 func (a *Anime) TitleAlt() map[string]string {
-	return nil
-}
-func (A *Anime) Aired() (time.Time, time.Time, bool) {
-	return time.Now(), time.Now(), false
+	titles := make(map[string]string)
+	for k, v := range a.infos {
+		if slices.Contains([]string{"synonyms", "japanese", "english", "german", "french", "spanish"}, k) {
+			titles[k] = strings.Join(v, ", ")
+		}
+	}
+	return titles
 }
 
 func (a *Anime) fetchEpisodes(url Url) func() error {
 	return func() error {
-		_ = url
+		res, err := http.Get(string(url))
+		if err != nil {
+			return err
+		}
+		switch res.StatusCode {
+		case 404:
+			return nil
+		case 429:
+			fixLock(string(url))
+			return a.fetchEpisodes(url)()
+		default:
+			if res.StatusCode != 200 {
+				return fmt.Errorf("unknown statuscode on episode fetch %v", res.StatusCode)
+			}
+		}
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			return err
+		}
+		_ = doc
 		return nil
 	}
 }
 
 func FetchAnime(url Url) (*Anime, error) {
-	resp, err := http.Get(string(url))
-	if err != nil {
-		return nil, err
-	}
 	var anime Anime
 	var eg errgroup.Group
 	eg.Go(anime.fetchEpisodes(url))
-	switch resp.StatusCode {
+	res, err := http.Get(string(url))
+	if err != nil {
+		return nil, err
+	}
+	switch res.StatusCode {
 	case 404:
 		return nil, nil
 	case 429:
-		fixLock()
+		fixLock(string(url))
 		return FetchAnime(url)
 	default:
-		if resp.StatusCode != 200 {
-			log.Panicf("unknown statuscode on anime fetch %v", resp.StatusCode)
+		if res.StatusCode != 200 {
+			return &anime, fmt.Errorf("unknown statuscode on anime fetch %v", res.StatusCode)
 		}
 	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +177,6 @@ func readInfos(doc *goquery.Document) map[string][]string {
 			values = append(values, strings.Trim(strings.Join(strings.Split(s.Text(), ":")[1:], ":"), "\n "))
 		}
 		for _, v := range values {
-			v = strings.ReplaceAll(v, "\n", "")
 			v = strings.Join(strings.Fields(v), " ")
 			vals, ok := infos[key]
 			if ok {
