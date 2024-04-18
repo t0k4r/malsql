@@ -53,19 +53,17 @@ func (a *Anime) Season() (string, time.Time, bool) {
 	var t time.Time
 	var err error
 	sds := strings.Split(strings.Trim(str, " \n"), " ")
-	if len(sds) == 2 {
-		t, err = time.Parse("2006", sds[1])
-		if err == nil {
-			switch sds[0] {
-			case "Spring":
-				t = t.AddDate(0, 2, 20)
-			case "Summer":
-				t = t.AddDate(0, 5, 21)
-			case "Fall":
-				t = t.AddDate(0, 8, 23)
-			case "Winter":
-				t = t.AddDate(0, 11, 22)
-			}
+	t, err = time.Parse("2006", sds[1])
+	if err == nil {
+		switch sds[0] {
+		case "Spring":
+			t = t.AddDate(0, 2, 20)
+		case "Summer":
+			t = t.AddDate(0, 5, 21)
+		case "Fall":
+			t = t.AddDate(0, 8, 23)
+		case "Winter":
+			t = t.AddDate(0, 11, 22)
 		}
 	}
 	return str, t, ok
@@ -96,9 +94,9 @@ func (a *Anime) TitleAlt() map[string]string {
 	return titles
 }
 
-func (a *Anime) fetchEpisodes(url Url) func() error {
+func (a *Anime) fetchEpisodes(url Url, offset int) func() error {
 	return func() error {
-		res, err := http.Get(string(url))
+		res, err := http.Get(fmt.Sprintf("%v/offset=%v", url, offset))
 		if err != nil {
 			return err
 		}
@@ -107,7 +105,7 @@ func (a *Anime) fetchEpisodes(url Url) func() error {
 			return nil
 		case 429:
 			fixLock(string(url))
-			return a.fetchEpisodes(url)()
+			return a.fetchEpisodes(url, offset)()
 		default:
 			if res.StatusCode != 200 {
 				return fmt.Errorf("unknown statuscode on episode fetch %v", res.StatusCode)
@@ -118,14 +116,18 @@ func (a *Anime) fetchEpisodes(url Url) func() error {
 			return err
 		}
 		_ = doc
-		return nil
+		var episodes []Episode
+		if len(episodes) == 0 {
+			return nil
+		}
+		return a.fetchEpisodes(url, offset+100)()
 	}
 }
 
 func FetchAnime(url Url) (*Anime, error) {
 	var anime Anime
 	var eg errgroup.Group
-	eg.Go(anime.fetchEpisodes(url))
+	eg.Go(anime.fetchEpisodes(url, 0))
 	res, err := http.Get(string(url))
 	if err != nil {
 		return nil, err
