@@ -7,10 +7,23 @@ import (
 	"net/http"
 )
 
-func main() {
+type AddHeaderTransport struct {
+	T http.RoundTripper
+}
+
+func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0")
+	return adt.T.RoundTrip(req)
+}
+
+func init() {
 	http.DefaultClient.Transport = &AddHeaderTransport{
 		T: http.DefaultTransport,
 	}
+}
+
+func main() {
+
 	err := get.
 		NewUniqChan().
 		Generate(1, 16).
