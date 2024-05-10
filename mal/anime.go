@@ -102,8 +102,8 @@ func (a *Anime) fetchEpisodes(url Url, offset int) func() error {
 		switch res.StatusCode {
 		case 404:
 			return nil
-		case 429:
-			fixLock(string(url))
+		case 429, 405:
+			waitLock()
 			return a.fetchEpisodes(url, offset)()
 		default:
 			if res.StatusCode != 200 {
@@ -125,7 +125,7 @@ func (a *Anime) fetchEpisodes(url Url, offset int) func() error {
 				TitleAlt: titlealt.Text(),
 			})
 		})
-		if len(episodes) == 0 {
+		if len(episodes) < 100 {
 			return nil
 		}
 		a.Episodes = append(a.Episodes, episodes...)
@@ -144,8 +144,8 @@ func FetchAnime(url Url) (*Anime, error) {
 	switch res.StatusCode {
 	case 404:
 		return nil, nil
-	case 429:
-		fixLock(string(url))
+	case 429, 405:
+		waitLock()
 		return FetchAnime(url)
 	default:
 		if res.StatusCode != 200 {

@@ -1,18 +1,19 @@
 package mal
 
 import (
-	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 )
 
 var lock sync.Mutex
 
-func fixLock(url string) {
+func waitLock() {
 	switch lock.TryLock() {
 	case true:
-		slog.Error("MAL is locked please visit url to unlockit and press enter", "url", url)
-		fmt.Scanln()
+		t := time.Now().Add(time.Minute * 5)
+		slog.Error("MAL is locked waiting for it to unlock next try on", "time", t)
+		time.Sleep(time.Minute * 5)
 	default:
 		lock.Lock()
 	}
