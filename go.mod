@@ -1,16 +1,12 @@
 module malsql
 
-go 1.22.3
+go 1.23.1
 
-toolchain go1.22.5
-
-require (
-	github.com/PuerkitoBio/goquery v1.9.1
-	github.com/t0k4r/x v0.0.0-20240730221004-68fbf957aba8
-	golang.org/x/sync v0.6.0
-)
+toolchain go1.23.2
 
 require (
-	github.com/andybalholm/cascadia v1.3.2 // indirect
-	golang.org/x/net v0.21.0 // indirect
+	github.com/PuerkitoBio/goquery v1.10.0
+	github.com/andybalholm/cascadia v1.3.2
+	github.com/t0k4r/x v0.0.0-20241023173540-b5987a9140ab
+	golang.org/x/net v0.30.0
 )
